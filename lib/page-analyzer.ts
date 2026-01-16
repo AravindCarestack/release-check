@@ -249,19 +249,10 @@ export function analyzePage(html: string, url: string, baseUrl?: URL): PageRepor
   }
 
   // Analyze Open Graph tags
+  // Note: Missing OG tags are shown as warnings in the UI but don't contribute to fail status
   const ogTitle = $('meta[property="og:title"]').attr("content") || null;
   const ogDescription = $('meta[property="og:description"]').attr("content") || null;
   const ogImage = $('meta[property="og:image"]').attr("content") || null;
-
-  if (!ogTitle) {
-    issues.push("Missing og:title");
-  }
-  if (!ogDescription) {
-    issues.push("Missing og:description");
-  }
-  if (!ogImage) {
-    issues.push("Missing og:image");
-  }
 
   // Analyze Twitter Card tags
   const twitterCard = $('meta[name="twitter:card"]').attr("content") || null;
