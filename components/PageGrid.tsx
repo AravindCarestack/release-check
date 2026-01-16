@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import PageCard from "./PageCard";
 import type { PageReport } from "@/lib/page-analyzer";
+import { groupPagesByLocale, sortLocaleGroups, detectLocale } from "@/lib/locale-detector";
 
 interface PageGridProps {
   pages: PageReport[];
@@ -31,6 +32,19 @@ export default function PageGrid({ pages }: PageGridProps) {
     const warned = pages.filter((p) => p.status === "warn").length;
     const failed = pages.filter((p) => p.status === "fail").length;
     return { passed, warned, failed, total: pages.length };
+  }, [pages]);
+
+  // Group pages by locale
+  const localeGroups = useMemo(() => {
+    const filtered = filteredPages;
+    const groups = groupPagesByLocale(filtered);
+    return sortLocaleGroups(groups);
+  }, [filteredPages]);
+
+  // Check if we have multiple locales
+  const hasMultipleLocales = useMemo(() => {
+    const groups = groupPagesByLocale(pages);
+    return groups.size > 1 || (groups.size === 1 && !groups.has("default"));
   }, [pages]);
 
   return (
@@ -119,7 +133,7 @@ export default function PageGrid({ pages }: PageGridProps) {
         </div>
       </div>
 
-      {/* Grid - Always show all pages when filter is "all" */}
+      {/* Grid - Grouped by locale if multiple locales detected */}
       {filteredPages.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-md border border-gray-200">
           <p className="text-gray-500">
@@ -128,7 +142,57 @@ export default function PageGrid({ pages }: PageGridProps) {
               : "No pages match the current filter. Try selecting 'All Pages' to see all crawled pages."}
           </p>
         </div>
+      ) : hasMultipleLocales ? (
+        // Show grouped by locale
+        <div className="space-y-8">
+          {localeGroups.map((group, groupIndex) => (
+            <div key={group.locale.locale} className="space-y-4">
+              {/* Locale Header */}
+              <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {group.locale.displayName}
+                  </h3>
+                  <span className="text-sm text-gray-500 bg-gray-100 px-2.5 py-1 rounded-md">
+                    {group.pages.length} {group.pages.length === 1 ? "page" : "pages"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <span className={`px-2 py-1 rounded ${
+                    group.pages.filter(p => p.status === "pass").length > 0
+                      ? "bg-green-100 text-green-700"
+                      : ""
+                  }`}>
+                    {group.pages.filter(p => p.status === "pass").length} passed
+                  </span>
+                  <span className={`px-2 py-1 rounded ${
+                    group.pages.filter(p => p.status === "warn").length > 0
+                      ? "bg-yellow-100 text-yellow-700"
+                      : ""
+                  }`}>
+                    {group.pages.filter(p => p.status === "warn").length} warnings
+                  </span>
+                  <span className={`px-2 py-1 rounded ${
+                    group.pages.filter(p => p.status === "fail").length > 0
+                      ? "bg-red-100 text-red-700"
+                      : ""
+                  }`}>
+                    {group.pages.filter(p => p.status === "fail").length} failed
+                  </span>
+                </div>
+              </div>
+              
+              {/* Pages Grid for this locale */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {group.pages.map((page, index) => (
+                  <PageCard key={`${page.url}-${index}`} page={page} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
+        // Show all pages in a single grid (no locale grouping)
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPages.map((page, index) => (
             <PageCard key={`${page.url}-${index}`} page={page} />

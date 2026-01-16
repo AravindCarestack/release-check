@@ -79,33 +79,19 @@ export async function parseSitemap(sitemapUrl: string, debug: boolean = false): 
           throw new Error(`Invalid sitemap content type: ${contentType}`);
         }
 
-        // Parse XML with better namespace handling
-        const $ = cheerio.load(contentText, { 
+        // Parse XML - strip namespaces first to avoid cheerio/css-select issues
+        // WHY: Cheerio's css-select doesn't support namespaced tag names
+        // We'll remove namespace prefixes from tag names before parsing
+        const contentWithoutNamespaces = contentText.replace(/<(\/?)([a-zA-Z]+):([a-zA-Z]+)/g, '<$1$3');
+        const $ = cheerio.load(contentWithoutNamespaces, { 
           xmlMode: true,
-          decodeEntities: true,
-          normalizeWhitespace: false,
         });
 
         const foundUrls: string[] = [];
 
-        // Check if this is a sitemap index file (handle all namespace variations)
+        // Check if this is a sitemap index file
         // WHY: Sites often use sitemap index files that reference multiple child sitemaps
-        // Some sitemaps use namespaces (xmlns), some don't - we check all variations
-        const sitemapIndexSelectors = [
-          "sitemapindex > sitemap > loc",
-          "sitemap > loc",
-          "*|sitemapindex > *|sitemap > *|loc",
-          "[xmlns] sitemapindex > sitemap > loc",
-        ];
-        
-        let sitemapIndexEntries = cheerio.load("", { xmlMode: true })();
-        for (const selector of sitemapIndexSelectors) {
-          const matches = $(selector);
-          if (matches.length > 0) {
-            sitemapIndexEntries = matches;
-            break;
-          }
-        }
+        const sitemapIndexEntries = $("sitemapindex > sitemap > loc, sitemap > loc");
         
         if (sitemapIndexEntries.length > 0) {
           // This is a sitemap index - recursively fetch child sitemaps
@@ -143,28 +129,15 @@ export async function parseSitemap(sitemapUrl: string, debug: boolean = false): 
           return successfulResults.flat();
         }
 
-        // Regular sitemap - extract all <loc> URLs (handle all namespace variations)
+        // Regular sitemap - extract all <loc> URLs
         // WHY: Standard sitemap format uses <loc> tags to list page URLs
-        // Some sitemaps use namespaces (xmlns), some don't - check all variations
-        const urlSelectors = [
-          "urlset > url > loc",
-          "url > loc",
-          "*|urlset > *|url > *|loc",
-          "[xmlns] urlset > url > loc",
-        ];
-
-        for (const selector of urlSelectors) {
-          const matches = $(selector);
-          if (matches.length > 0) {
-            matches.each((_, element) => {
-              const urlText = $(element).text().trim();
-              if (urlText) {
-                foundUrls.push(urlText);
-              }
-            });
-            break; // Use first selector that finds URLs
+        const urlEntries = $("urlset > url > loc, url > loc");
+        urlEntries.each((_, element) => {
+          const urlText = $(element).text().trim();
+          if (urlText) {
+            foundUrls.push(urlText);
           }
-        }
+        });
 
         // If no URLs found with standard selectors, try more aggressive parsing
         if (foundUrls.length === 0) {
@@ -204,9 +177,15 @@ export async function parseSitemap(sitemapUrl: string, debug: boolean = false): 
     }
 
     // If all retries failed, throw the last error
-    const errorMessage = lastError?.response 
-      ? `HTTP ${lastError.response.status}: ${lastError.message}`
-      : lastError?.message || "Unknown error";
+    let errorMessage = "Unknown error";
+    if (lastError) {
+      if ('response' in lastError && lastError.response) {
+        const axiosError = lastError as any;
+        errorMessage = `HTTP ${axiosError.response.status}: ${axiosError.message}`;
+      } else {
+        errorMessage = lastError.message || "Unknown error";
+      }
+    }
     throw new Error(`Failed to fetch/parse sitemap ${url} after ${MAX_RETRIES} attempts: ${errorMessage}`);
   }
 
@@ -259,36 +238,76 @@ export async function discoverSitemap(baseUrl: URL, debug: boolean = false): Pro
         if (!cleanUrl) continue;
         
         // Normalize URL (handle relative URLs in robots.txt)
+        // Also handle www vs non-www - if sitemap URL has different www than base, try both
         try {
-          const absoluteSitemapUrl = new URL(cleanUrl, baseUrl).href;
+          let absoluteSitemapUrl = new URL(cleanUrl, baseUrl).href;
+          
+          // If sitemap URL has different www prefix than base URL, try both
+          const sitemapUrlObj = new URL(cleanUrl);
+          const baseHostnameNoWww = baseUrl.hostname.replace(/^www\./, "");
+          const sitemapHostnameNoWww = sitemapUrlObj.hostname.replace(/^www\./, "");
+          
+          // If they're the same domain but different www, try the base URL's www preference
+          if (baseHostnameNoWww === sitemapHostnameNoWww && 
+              baseUrl.hostname.startsWith("www.") !== sitemapUrlObj.hostname.startsWith("www.")) {
+            // Try with base URL's www preference
+            const preferredHostname = baseUrl.hostname.startsWith("www.") 
+              ? `www.${sitemapHostnameNoWww}` 
+              : sitemapHostnameNoWww;
+            absoluteSitemapUrl = new URL(sitemapUrlObj.pathname + sitemapUrlObj.search, 
+              `${sitemapUrlObj.protocol}//${preferredHostname}`).href;
+            if (debug) {
+              console.log(`[SitemapDiscovery] Normalized sitemap URL www: ${cleanUrl} -> ${absoluteSitemapUrl}`);
+            }
+          } else {
+            absoluteSitemapUrl = new URL(cleanUrl, baseUrl).href;
+          }
           
           // Verify it exists (try both HEAD and GET with retries)
-          for (const method of ["head", "get"] as const) {
-            try {
-              const testResponse = method === "head"
-                ? await axios.head(absoluteSitemapUrl, {
-                    timeout: 8000,
-                    validateStatus: () => true,
-                    maxRedirects: 3,
-                  })
-                : await axios.get(absoluteSitemapUrl, {
-                    timeout: 8000,
-                    validateStatus: (status) => status === 200,
-                    maxRedirects: 3,
-                    headers: {
-                      "User-Agent": "Mozilla/5.0 (compatible; SEOValidator/1.0)",
-                      "Accept": "application/xml, text/xml, */*",
-                    },
-                  });
-              
-              if (testResponse.status === 200) {
-                if (debug) console.log(`[SitemapDiscovery] ✓ Found sitemap in robots.txt: ${absoluteSitemapUrl}`);
-                return absoluteSitemapUrl;
-              }
-            } catch (error: any) {
-              // If HEAD fails, try GET; if GET fails, continue to next sitemap
-              if (method === "get") {
-                continue;
+          // Also try the opposite www version if different
+          const urlsToTry = [absoluteSitemapUrl];
+          if (baseHostnameNoWww === sitemapHostnameNoWww && 
+              baseUrl.hostname.startsWith("www.") !== sitemapUrlObj.hostname.startsWith("www.")) {
+            // Try the opposite www version too
+            const oppositeHostname = baseUrl.hostname.startsWith("www.") 
+              ? sitemapHostnameNoWww 
+              : `www.${sitemapHostnameNoWww}`;
+            const oppositeUrl = new URL(sitemapUrlObj.pathname + sitemapUrlObj.search, 
+              `${sitemapUrlObj.protocol}//${oppositeHostname}`).href;
+            urlsToTry.push(oppositeUrl);
+            if (debug) {
+              console.log(`[SitemapDiscovery] Will try both www versions: ${absoluteSitemapUrl} and ${oppositeUrl}`);
+            }
+          }
+          
+          for (const urlToTry of urlsToTry) {
+            for (const method of ["head", "get"] as const) {
+              try {
+                const testResponse = method === "head"
+                  ? await axios.head(urlToTry, {
+                      timeout: 8000,
+                      validateStatus: () => true,
+                      maxRedirects: 3,
+                    })
+                  : await axios.get(urlToTry, {
+                      timeout: 8000,
+                      validateStatus: (status) => status === 200,
+                      maxRedirects: 3,
+                      headers: {
+                        "User-Agent": "Mozilla/5.0 (compatible; SEOValidator/1.0)",
+                        "Accept": "application/xml, text/xml, */*",
+                      },
+                    });
+                
+                if (testResponse.status === 200) {
+                  if (debug) console.log(`[SitemapDiscovery] ✓ Found sitemap in robots.txt: ${urlToTry}`);
+                  return urlToTry;
+                }
+              } catch (error: any) {
+                // If HEAD fails, try GET; if GET fails, continue to next URL or sitemap
+                if (method === "get" && urlToTry === urlsToTry[urlsToTry.length - 1]) {
+                  continue; // Last URL, last method - continue to next sitemap
+                }
               }
             }
           }

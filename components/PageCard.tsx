@@ -33,7 +33,7 @@ export default function PageCard({ page }: PageCardProps) {
       </div>
 
       {/* H1 Tag Check */}
-      <div className="mb-4">
+      <div className="mb-4 min-w-0">
         <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
           H1 Tags ({page.h1Count})
         </div>
@@ -42,10 +42,11 @@ export default function PageCard({ page }: PageCardProps) {
           hasValue={page.hasSingleH1} 
         />
         {page.h1Texts.length > 0 && (
-          <div className="mt-2 space-y-1">
+          <div className="mt-2 space-y-1 min-w-0">
             {page.h1Texts.map((text, idx) => (
-              <div key={idx} className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100">
-                <span className="font-medium">H1 {idx + 1}:</span> {text}
+              <div key={idx} className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 min-w-0 overflow-hidden">
+                <span className="font-medium">H1 {idx + 1}:</span>{" "}
+                <span className="break-all break-words">{text}</span>
               </div>
             ))}
           </div>

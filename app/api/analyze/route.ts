@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeWebsite } from "@/lib/seo-analyzer";
-import { crawlWebsite } from "@/lib/crawler";
+import { crawlWebsite } from "@/lib/crawler-sitemap-first";
 import { analyzePage } from "@/lib/page-analyzer";
 import type { PageReport } from "@/lib/page-analyzer";
+
+// Increase timeout for browser-based crawling (can take longer)
+export const maxDuration = 300; // 5 minutes (Vercel limit)
+export const dynamic = 'force-dynamic';
 
 const MAX_CONCURRENT_ANALYSIS = 5;
 
@@ -119,12 +123,11 @@ export async function GET(request: NextRequest) {
       }
 
       // Crawl the website using sitemap-first approach
-      // WHY: Modern sites expose pages via sitemap.xml which is more reliable than HTML-only crawling
+      // WHY: Uses sitemap URLs directly via HTTP - most reliable for production sites
       const crawlResult = await crawlWebsite(normalizedUrl, {
         maxPages: maxPages, // Configurable via query parameter, default 200
-        maxConcurrent: 5,
-        timeout: 15000,
-        debug: false, // Set to true for detailed logging
+        timeout: 15000, // 15 seconds per page
+        debug: true, // Enable debug logging to diagnose issues
       });
 
       const crawledPages = crawlResult.pages;

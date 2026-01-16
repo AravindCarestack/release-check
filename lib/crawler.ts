@@ -665,7 +665,7 @@ export async function crawlWebsite(
             
             // Prioritize adding links if we have room
             // Note: Links from extractLinksFromHtml are already normalized, so we don't need to normalize again
-            for (const link of htmlLinks) {
+            for (const link of Array.from(htmlLinks)) {
               if (addedFromHtml >= remainingSlots) {
                 if (debug) {
                   console.log(`[Crawler] Stopped adding HTML links - reached remaining slots limit (${remainingSlots})`);

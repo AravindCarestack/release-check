@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { SEOAnalysisResult } from "@/app/types";
 import type { PageReport } from "@/lib/page-analyzer";
 import ResultsDisplay from "@/components/ResultsDisplay";
 import PageGrid from "@/components/PageGrid";
+import Terminal from "@/components/Terminal";
+import { groupPagesByLocale, sortLocaleGroups } from "@/lib/locale-detector";
 
 interface CrawlResult {
   totalPages: number;
@@ -23,6 +25,20 @@ function ResultsContent() {
   const [crawlResult, setCrawlResult] = useState<CrawlResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [terminalLogs, setTerminalLogs] = useState<Array<{ timestamp: string; level: "info" | "success" | "warning" | "error"; message: string }>>([]);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  // Detect locales from crawled pages
+  const localeInfo = useMemo(() => {
+    if (!crawlResult?.pages) return null;
+    const groups = groupPagesByLocale(crawlResult.pages);
+    const sorted = sortLocaleGroups(groups);
+    return {
+      groups: sorted,
+      count: groups.size,
+      hasMultiple: groups.size > 1 || (groups.size === 1 && !groups.has("default")),
+    };
+  }, [crawlResult?.pages]);
 
   useEffect(() => {
     const url = searchParams.get("url");
@@ -37,23 +53,76 @@ function ResultsContent() {
     const fetchAnalysis = async () => {
       try {
         setLoading(true);
-        const apiUrl = `/api/analyze?url=${encodeURIComponent(url)}${crawl ? `&crawl=true` : ""}`;
+        setTerminalLogs([]);
+        
+        if (crawl) {
+          // Use streaming API for crawl mode
+          setIsStreaming(true);
+          const streamUrl = `/api/analyze/stream?url=${encodeURIComponent(url)}&crawl=true`;
+          const eventSource = new EventSource(streamUrl);
+
+          eventSource.onmessage = (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              
+              if (data.type === "complete") {
+                eventSource.close();
+                setIsStreaming(false);
+                // Fetch final results
+                fetchFinalResults(url);
+                return;
+              }
+
+              // Add log entry
+              if (data.timestamp && data.level && data.message) {
+                setTerminalLogs(prev => [...prev, data]);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          };
+
+          eventSource.onerror = () => {
+            eventSource.close();
+            setIsStreaming(false);
+            // Try to fetch results anyway
+            fetchFinalResults(url);
+          };
+        } else {
+          // Regular API for single page
+          const apiUrl = `/api/analyze?url=${encodeURIComponent(url)}`;
+          const response = await fetch(apiUrl);
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || "Failed to analyze website");
+          }
+
+          const data = await response.json();
+          setSingleResult(data as SEOAnalysisResult);
+          setLoading(false);
+        }
+      } catch (err: any) {
+        setError(err.message || "An error occurred while analyzing the website");
+        setLoading(false);
+        setIsStreaming(false);
+      }
+    };
+
+    const fetchFinalResults = async (url: string) => {
+      try {
+        const apiUrl = `/api/analyze?url=${encodeURIComponent(url)}&crawl=true`;
         const response = await fetch(apiUrl);
         
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to analyze website");
+          throw new Error(errorData.error || "Failed to fetch results");
         }
 
         const data = await response.json();
-        
-        if (crawl) {
-          setCrawlResult(data as CrawlResult);
-        } else {
-          setSingleResult(data as SEOAnalysisResult);
-        }
+        setCrawlResult(data as CrawlResult);
       } catch (err: any) {
-        setError(err.message || "An error occurred while analyzing the website");
+        setError(err.message || "Failed to fetch final results");
       } finally {
         setLoading(false);
       }
@@ -63,6 +132,49 @@ function ResultsContent() {
   }, [searchParams]);
 
   if (loading) {
+    const crawl = searchParams.get("crawl") === "true";
+    
+    if (crawl) {
+      // Show terminal for crawl mode
+      return (
+        <div className="min-h-screen bg-gray-50 py-8">
+          <div className="container mx-auto px-6">
+            <div className="max-w-7xl mx-auto">
+              <div className="mb-6">
+                <button
+                  onClick={() => router.push("/")}
+                  className="text-blue-600 hover:text-blue-700 mb-4 flex items-center text-sm font-medium"
+                >
+                  <svg
+                    className="w-4 h-4 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                    />
+                  </svg>
+                  Back to Home
+                </button>
+                <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+                  Crawling Website
+                </h1>
+                <p className="text-sm text-gray-600">
+                  Real-time crawling progress
+                </p>
+              </div>
+              <Terminal logs={terminalLogs} isStreaming={isStreaming} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    // Regular loading for single page
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
@@ -87,7 +199,7 @@ function ResultsContent() {
             ></path>
           </svg>
           <p className="text-base text-gray-700 font-medium">
-            {searchParams.get("crawl") === "true" ? "Crawling and analyzing website..." : "Analyzing website..."}
+            Analyzing website...
           </p>
           <p className="text-sm text-gray-500 mt-2">
             This may take a minute
@@ -147,10 +259,25 @@ function ResultsContent() {
               <h1 className="text-2xl font-semibold text-gray-900 mb-2">
                 SEO Analysis Results
               </h1>
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <p className="text-sm text-gray-600">
                   Analyzed {crawlResult.totalPages} page{crawlResult.totalPages !== 1 ? "s" : ""} from the website
                 </p>
+                {localeInfo && localeInfo.hasMultiple && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-700">
+                      Regions detected:
+                    </span>
+                    {localeInfo.groups.map((group) => (
+                      <span
+                        key={group.locale.locale}
+                        className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md font-medium border border-blue-200"
+                      >
+                        {group.locale.displayName} ({group.pages.length})
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {crawlResult.sitemap && (
                   <div className="flex items-center gap-2">
                     <span className={`text-sm font-medium ${crawlResult.sitemap.present ? "text-green-600" : "text-red-600"}`}>

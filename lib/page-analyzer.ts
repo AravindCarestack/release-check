@@ -55,26 +55,33 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
   // Use Cheerio to find script tags more reliably
   const $ = cheerio.load(html);
   const jsonLdScripts: string[] = [];
+  const processedScripts = new Set<number>(); // Track processed scripts to avoid duplicates
 
-  // Find all script tags with type="application/ld+json"
-  $('script[type="application/ld+json"]').each((_, element) => {
-    const content = $(element).html();
-    if (content && content.trim()) {
-      jsonLdScripts.push(content.trim());
-    }
-  });
-
-  // Also check for script tags without explicit type but with JSON-LD content
-  $('script').each((_, element) => {
-    const type = $(element).attr("type");
-    const content = $(element).html();
+  // Find all script tags and check for JSON-LD
+  $('script').each((index, element) => {
+    const $element = $(element);
+    const type = $element.attr("type");
+    const content = $element.html() || $element.text(); // Try both html() and text()
     
-    // If no type specified, check if content looks like JSON-LD
-    if (!type && content && content.trim()) {
-      const trimmed = content.trim();
-      if ((trimmed.startsWith("{") || trimmed.startsWith("[")) && 
-          (trimmed.includes("@context") || trimmed.includes("@type"))) {
+    if (!content || !content.trim()) {
+      return; // Skip empty scripts
+    }
+
+    const trimmed = content.trim();
+    
+    // Check if type attribute indicates JSON-LD (case-insensitive)
+    const isJsonLdType = type && type.toLowerCase().includes("application/ld+json");
+    
+    // Check if content looks like JSON-LD (starts with { or [ and contains @context or @type)
+    const looksLikeJsonLd = (trimmed.startsWith("{") || trimmed.startsWith("[")) && 
+                            (trimmed.includes("@context") || trimmed.includes("@type"));
+
+    // If it's explicitly marked as JSON-LD or looks like JSON-LD
+    if (isJsonLdType || looksLikeJsonLd) {
+      // Avoid duplicates by checking if we've already processed this script
+      if (!processedScripts.has(index)) {
         jsonLdScripts.push(trimmed);
+        processedScripts.add(index);
       }
     }
   });
@@ -86,29 +93,67 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
   for (const jsonContent of jsonLdScripts) {
     count++;
     try {
-      const parsed = JSON.parse(jsonContent);
+      // Clean up the JSON content - remove any HTML comments or extra whitespace
+      let cleanedContent = jsonContent.trim();
+      
+      // Remove HTML comments if present
+      cleanedContent = cleanedContent.replace(/<!--[\s\S]*?-->/g, '');
+      
+      // Try to parse the JSON
+      const parsed = JSON.parse(cleanedContent);
       
       // Basic validation - check if it's an object or array
       if (typeof parsed !== "object" || parsed === null) {
         valid = false;
         errors.push(`JSON-LD ${count}: Not a valid object or array`);
+        continue;
+      }
+      
+      // Validate JSON-LD structure
+      let hasValidStructure = false;
+      
+      if (Array.isArray(parsed)) {
+        // If it's an array, check each element
+        if (parsed.length === 0) {
+          valid = false;
+          errors.push(`JSON-LD ${count}: Empty array`);
+          continue;
+        }
+        
+        // Check if at least one element has @context or @type
+        hasValidStructure = parsed.some((item: any) => 
+          item && typeof item === "object" && (item["@context"] || item["@type"])
+        );
+        
+        if (!hasValidStructure) {
+          // Might still be valid, but warn
+          errors.push(`JSON-LD ${count}: Array elements missing @context or @type`);
+        }
       } else {
-        // Additional validation - check for @context or @type (common JSON-LD properties)
-        if (Array.isArray(parsed)) {
-          // If it's an array, check first element
-          if (parsed.length > 0 && typeof parsed[0] === "object" && 
-              (!parsed[0]["@context"] && !parsed[0]["@type"])) {
-            // Not necessarily invalid, but might not be JSON-LD
-          }
-        } else if (!parsed["@context"] && !parsed["@type"]) {
+        // Single object - check for @context or @type
+        hasValidStructure = !!(parsed["@context"] || parsed["@type"]);
+        
+        if (!hasValidStructure) {
           // Might still be valid JSON-LD, but missing common properties
           // Don't mark as invalid, just note it
+          errors.push(`JSON-LD ${count}: Missing @context or @type (may still be valid)`);
         }
       }
+      
+      // If we got here and it's valid JSON, consider it valid even if structure is questionable
+      // (some JSON-LD might not have @context/@type in all cases)
+      
     } catch (error: any) {
       valid = false;
-      errors.push(`JSON-LD ${count}: ${error.message}`);
+      const errorMessage = error.message || "Unknown parsing error";
+      errors.push(`JSON-LD ${count}: ${errorMessage}`);
     }
+  }
+
+  // If we have at least one valid JSON-LD script, consider it valid overall
+  // (even if some have errors, others might be fine)
+  if (count > 0 && errors.length < count) {
+    valid = true;
   }
 
   return { valid, count, errors };
