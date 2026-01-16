@@ -13,8 +13,16 @@ type FilterType = "all" | "failed" | "missingH1" | "missingDescription";
 
 export default function PageGrid({ pages }: PageGridProps) {
   const [filter, setFilter] = useState<FilterType>("all");
+  const [selectedLocale, setSelectedLocale] = useState<string>("all");
 
-  const filteredPages = useMemo(() => {
+  // Get all available locales
+  const availableLocales = useMemo(() => {
+    const groups = groupPagesByLocale(pages);
+    return sortLocaleGroups(groups);
+  }, [pages]);
+
+  // Filter pages by status
+  const statusFilteredPages = useMemo(() => {
     switch (filter) {
       case "failed":
         return pages.filter((p) => p.status === "fail");
@@ -27,6 +35,17 @@ export default function PageGrid({ pages }: PageGridProps) {
     }
   }, [pages, filter]);
 
+  // Filter pages by locale
+  const filteredPages = useMemo(() => {
+    if (selectedLocale === "all") {
+      return statusFilteredPages;
+    }
+    return statusFilteredPages.filter((page) => {
+      const localeInfo = detectLocale(page.url);
+      return localeInfo.locale === selectedLocale;
+    });
+  }, [statusFilteredPages, selectedLocale]);
+
   const stats = useMemo(() => {
     const passed = pages.filter((p) => p.status === "pass").length;
     const warned = pages.filter((p) => p.status === "warn").length;
@@ -34,18 +53,20 @@ export default function PageGrid({ pages }: PageGridProps) {
     return { passed, warned, failed, total: pages.length };
   }, [pages]);
 
-  // Group pages by locale
+  // Group pages by locale (for display when "All Countries" is selected)
   const localeGroups = useMemo(() => {
-    const filtered = filteredPages;
-    const groups = groupPagesByLocale(filtered);
+    const groups = groupPagesByLocale(statusFilteredPages);
     return sortLocaleGroups(groups);
-  }, [filteredPages]);
+  }, [statusFilteredPages]);
 
-  // Check if we have multiple locales
+  // Check if we have multiple locales or any non-default locale
   const hasMultipleLocales = useMemo(() => {
-    const groups = groupPagesByLocale(pages);
-    return groups.size > 1 || (groups.size === 1 && !groups.has("default"));
-  }, [pages]);
+    if (availableLocales.length === 0) return false;
+    // Show dropdown if we have multiple locales OR if we have at least one non-default locale
+    if (availableLocales.length > 1) return true;
+    // Show if we have one locale that's not "default"
+    return availableLocales.length === 1 && availableLocales[0]?.locale.locale !== "default";
+  }, [availableLocales]);
 
   return (
     <div>
@@ -75,7 +96,29 @@ export default function PageGrid({ pages }: PageGridProps) {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Locale Filter Dropdown - Show when we have any locales detected */}
+        {availableLocales.length > 0 && (
+          <div className="flex items-center gap-3">
+            <label htmlFor="locale-filter" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+              Country/Region:
+            </label>
+            <select
+              id="locale-filter"
+              value={selectedLocale}
+              onChange={(e) => setSelectedLocale(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-md bg-white text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition min-w-[200px]"
+            >
+              <option value="all">All Countries ({pages.length})</option>
+              {availableLocales.map((group) => (
+                <option key={group.locale.locale} value={group.locale.locale}>
+                  {group.locale.displayName} ({group.pages.length})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Status Filters */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium text-gray-700">
             Filter:
@@ -125,27 +168,32 @@ export default function PageGrid({ pages }: PageGridProps) {
         {/* Results count */}
         <div className="text-sm text-gray-600 font-medium">
           Displaying {filteredPages.length} of {pages.length} total pages
+          {selectedLocale !== "all" && (
+            <span className="ml-2 text-gray-500">
+              (Country: {availableLocales.find(g => g.locale.locale === selectedLocale)?.locale.displayName || selectedLocale})
+            </span>
+          )}
           {filter !== "all" && (
             <span className="ml-2 text-gray-500">
-              (Filtered: {filter})
+              (Status: {filter})
             </span>
           )}
         </div>
       </div>
 
-      {/* Grid - Grouped by locale if multiple locales detected */}
+      {/* Grid - Show filtered pages */}
       {filteredPages.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-md border border-gray-200">
           <p className="text-gray-500">
             {pages.length === 0 
               ? "No pages were found. Please check if the website is accessible and contains internal links."
-              : "No pages match the current filter. Try selecting 'All Pages' to see all crawled pages."}
+              : "No pages match the current filter. Try selecting 'All Countries' or 'All Pages' to see all crawled pages."}
           </p>
         </div>
-      ) : hasMultipleLocales ? (
-        // Show grouped by locale
+      ) : selectedLocale === "all" && hasMultipleLocales ? (
+        // Show grouped by locale when "All Countries" is selected
         <div className="space-y-8">
-          {localeGroups.map((group, groupIndex) => (
+          {localeGroups.map((group) => (
             <div key={group.locale.locale} className="space-y-4">
               {/* Locale Header */}
               <div className="flex items-center justify-between border-b border-gray-200 pb-3">
@@ -192,7 +240,7 @@ export default function PageGrid({ pages }: PageGridProps) {
           ))}
         </div>
       ) : (
-        // Show all pages in a single grid (no locale grouping)
+        // Show filtered pages in a single grid (when a specific locale is selected or no multiple locales)
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPages.map((page, index) => (
             <PageCard key={`${page.url}-${index}`} page={page} />
