@@ -9,16 +9,22 @@ const MAX_RETRIES = 3; // Retry failed sitemap fetches
  * Parses a sitemap XML file and extracts all URLs
  * WHY: Modern sites expose all pages via sitemap.xml, which is more reliable than HTML crawling
  */
-export async function parseSitemap(sitemapUrl: string): Promise<string[]> {
+export async function parseSitemap(sitemapUrl: string, debug: boolean = false): Promise<string[]> {
   const urls: string[] = [];
   const visitedSitemaps = new Set<string>();
 
   async function fetchSitemap(url: string, depth: number = 0): Promise<string[]> {
     // Prevent infinite loops and excessive depth in sitemap index files
-    if (visitedSitemaps.has(url) || depth > MAX_SITEMAP_DEPTH) {
+    if (visitedSitemaps.has(url)) {
+      if (debug) console.log(`[Sitemap] Skipping already visited sitemap: ${url}`);
+      return [];
+    }
+    if (depth > MAX_SITEMAP_DEPTH) {
+      if (debug) console.warn(`[Sitemap] Max depth (${MAX_SITEMAP_DEPTH}) reached for: ${url}`);
       return [];
     }
     visitedSitemaps.add(url);
+    if (debug) console.log(`[Sitemap] Fetching sitemap (depth ${depth}): ${url}`);
 
     // Retry logic with exponential backoff
     let lastError: Error | null = null;
@@ -104,6 +110,7 @@ export async function parseSitemap(sitemapUrl: string): Promise<string[]> {
         if (sitemapIndexEntries.length > 0) {
           // This is a sitemap index - recursively fetch child sitemaps
           // WHY: Large sites split sitemaps into multiple files for better organization
+          if (debug) console.log(`[Sitemap] Found sitemap index with ${sitemapIndexEntries.length} child sitemaps`);
           const childSitemapPromises: Promise<string[]>[] = [];
           
           sitemapIndexEntries.each((_, element) => {
@@ -112,10 +119,11 @@ export async function parseSitemap(sitemapUrl: string): Promise<string[]> {
               // Normalize child sitemap URL (handle relative URLs)
               try {
                 const absoluteUrl = new URL(childSitemapUrl, normalizedUrl).href;
+                if (debug) console.log(`[Sitemap] Adding child sitemap: ${absoluteUrl}`);
                 childSitemapPromises.push(fetchSitemap(absoluteUrl, depth + 1));
               } catch (error) {
                 // Skip invalid URLs but log for debugging
-                console.warn(`[Sitemap] Invalid child sitemap URL: ${childSitemapUrl}`);
+                if (debug) console.warn(`[Sitemap] Invalid child sitemap URL: ${childSitemapUrl}`, error);
               }
             }
           });
@@ -160,6 +168,7 @@ export async function parseSitemap(sitemapUrl: string): Promise<string[]> {
 
         // If no URLs found with standard selectors, try more aggressive parsing
         if (foundUrls.length === 0) {
+          if (debug) console.log(`[Sitemap] No URLs found with standard selectors, trying aggressive parsing`);
           // Try finding any <loc> tag anywhere in the document
           $("loc").each((_, element) => {
             const urlText = $(element).text().trim();
@@ -167,6 +176,13 @@ export async function parseSitemap(sitemapUrl: string): Promise<string[]> {
               foundUrls.push(urlText);
             }
           });
+        }
+
+        if (debug) {
+          console.log(`[Sitemap] Extracted ${foundUrls.length} URLs from ${normalizedUrl}`);
+          if (foundUrls.length > 0 && foundUrls.length <= 5) {
+            console.log(`[Sitemap] Sample URLs:`, foundUrls.slice(0, 3));
+          }
         }
 
         return foundUrls;
@@ -201,7 +217,7 @@ export async function parseSitemap(sitemapUrl: string): Promise<string[]> {
  * Discovers sitemap URLs from common locations
  * WHY: Sitemaps can be at different paths, we check multiple common locations
  */
-export async function discoverSitemap(baseUrl: URL): Promise<string | null> {
+export async function discoverSitemap(baseUrl: URL, debug: boolean = false): Promise<string | null> {
   const commonPaths = [
     "/sitemap.xml",
     "/sitemap_index.xml",
@@ -213,8 +229,10 @@ export async function discoverSitemap(baseUrl: URL): Promise<string | null> {
 
   // First, check robots.txt for sitemap reference
   // WHY: robots.txt often contains the canonical sitemap location
+  if (debug) console.log(`[SitemapDiscovery] Checking robots.txt for ${baseUrl.hostname}`);
   try {
     const robotsUrl = new URL("/robots.txt", baseUrl).href;
+    if (debug) console.log(`[SitemapDiscovery] Fetching robots.txt: ${robotsUrl}`);
     const robotsResponse = await axios.get(robotsUrl, {
       timeout: 8000,
       validateStatus: () => true,
@@ -264,6 +282,7 @@ export async function discoverSitemap(baseUrl: URL): Promise<string | null> {
                   });
               
               if (testResponse.status === 200) {
+                if (debug) console.log(`[SitemapDiscovery] ✓ Found sitemap in robots.txt: ${absoluteSitemapUrl}`);
                 return absoluteSitemapUrl;
               }
             } catch (error: any) {
@@ -286,6 +305,7 @@ export async function discoverSitemap(baseUrl: URL): Promise<string | null> {
 
   // Check common sitemap locations concurrently for faster discovery
   // WHY: Many sites use standard paths even if not in robots.txt
+  if (debug) console.log(`[SitemapDiscovery] Checking common sitemap paths: ${commonPaths.join(", ")}`);
   const checkPromises = commonPaths.map(async (path) => {
     try {
       const sitemapUrl = new URL(path, baseUrl).href;
@@ -310,6 +330,7 @@ export async function discoverSitemap(baseUrl: URL): Promise<string | null> {
               });
           
           if (response.status === 200) {
+            if (debug) console.log(`[SitemapDiscovery] ✓ Found sitemap at common path: ${sitemapUrl}`);
             return sitemapUrl;
           }
         } catch {
@@ -332,5 +353,6 @@ export async function discoverSitemap(baseUrl: URL): Promise<string | null> {
     }
   }
 
+  if (debug) console.log(`[SitemapDiscovery] ✗ No sitemap found for ${baseUrl.hostname}`);
   return null;
 }

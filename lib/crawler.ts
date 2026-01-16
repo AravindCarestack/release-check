@@ -69,9 +69,13 @@ function isSafeUrl(url: URL): boolean {
  * Extracts all links from HTML content (comprehensive extraction)
  * WHY: Modern sites have links in various places - we need to catch them all
  */
-function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: NormalizeOptions): Set<string> {
+function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: NormalizeOptions, debug: boolean = false): Set<string> {
   const $ = cheerio.load(html);
   const links = new Set<string>();
+
+  // Store original base URL hostname for shouldCrawlUrl checks
+  // WHY: We need to check against the original site's hostname, not the base tag's hostname
+  const originalBaseHostname = normalizeOptions.baseUrl.hostname;
 
   // Get base tag href if present (affects relative URL resolution)
   // WHY: <base> tag changes how relative URLs are resolved
@@ -83,10 +87,16 @@ function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: Norm
       if (baseHrefAttr) {
         // Resolve base href relative to current page URL
         baseHref = new URL(baseHrefAttr, baseUrl);
-        // Update normalizeOptions to use the base href for relative URL resolution
+        if (debug) {
+          console.log(`[LinkExtraction] Found <base> tag: ${baseHrefAttr} -> ${baseHref.href}`);
+        }
+        // Create new normalizeOptions for URL resolution, but keep original baseUrl for hostname checks
         normalizeOptions = { ...normalizeOptions, baseUrl: baseHref };
       }
-    } catch {
+    } catch (error) {
+      if (debug) {
+        console.warn(`[LinkExtraction] Invalid base tag: ${baseTag.attr("href")}`, error);
+      }
       // Invalid base tag, ignore
     }
   }
@@ -94,23 +104,39 @@ function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: Norm
 
   // Extract from ALL anchor tags
   // WHY: Using "a[href]" gets all links
+  let anchorCount = 0;
   $("a[href]").each((_, element) => {
     const href = $(element).attr("href");
     if (!href || href.trim() === "") return;
+    anchorCount++;
 
-    // Resolve relative URLs using effective base URL
-    try {
-      const resolvedUrl = new URL(href, effectiveBaseUrl).href;
-      if (shouldCrawlUrl(resolvedUrl, normalizeOptions.baseUrl.hostname, normalizeOptions)) {
+      // Resolve relative URLs using effective base URL
+      try {
+        const resolvedUrl = new URL(href, effectiveBaseUrl).href;
+        // Use original base hostname for shouldCrawlUrl check, not base tag hostname
+        if (shouldCrawlUrl(resolvedUrl, originalBaseHostname, normalizeOptions, debug)) {
         const normalized = canonicalizeUrl(resolvedUrl, normalizeOptions);
         if (normalized) {
           links.add(normalized);
+          if (debug && links.size <= 5) {
+            console.log(`[LinkExtraction] Added link from <a>: ${href} -> ${normalized}`);
+          }
+        } else if (debug) {
+          console.warn(`[LinkExtraction] Failed to normalize URL from <a>: ${href}`);
         }
+      } else if (debug && links.size < 10) {
+        console.log(`[LinkExtraction] Rejected link from <a> (not crawlable): ${href}`);
       }
-    } catch {
+    } catch (error) {
+      if (debug) {
+        console.warn(`[LinkExtraction] Invalid URL from <a>: ${href}`, error);
+      }
       // Invalid URL, skip
     }
   });
+  if (debug) {
+    console.log(`[LinkExtraction] Found ${anchorCount} anchor tags, extracted ${links.size} unique links so far`);
+  }
 
   // Extract from <area> tags in image maps
   // WHY: Image maps can contain clickable links
@@ -120,7 +146,7 @@ function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: Norm
 
     try {
       const resolvedUrl = new URL(href, effectiveBaseUrl).href;
-      if (shouldCrawlUrl(resolvedUrl, normalizeOptions.baseUrl.hostname, normalizeOptions)) {
+      if (shouldCrawlUrl(resolvedUrl, originalBaseHostname, normalizeOptions)) {
         const normalized = canonicalizeUrl(resolvedUrl, normalizeOptions);
         if (normalized) {
           links.add(normalized);
@@ -141,7 +167,7 @@ function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: Norm
     if (href && (rel === "canonical" || rel === "alternate" || rel === "next" || rel === "prev")) {
       try {
         const resolvedUrl = new URL(href, effectiveBaseUrl).href;
-        if (shouldCrawlUrl(resolvedUrl, normalizeOptions.baseUrl.hostname, normalizeOptions)) {
+        if (shouldCrawlUrl(resolvedUrl, originalBaseHostname, normalizeOptions)) {
           const normalized = canonicalizeUrl(resolvedUrl, normalizeOptions);
           if (normalized) {
             links.add(normalized);
@@ -161,7 +187,7 @@ function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: Norm
 
     try {
       const resolvedUrl = new URL(action, effectiveBaseUrl).href;
-      if (shouldCrawlUrl(resolvedUrl, normalizeOptions.baseUrl.hostname, normalizeOptions)) {
+      if (shouldCrawlUrl(resolvedUrl, originalBaseHostname, normalizeOptions)) {
         const normalized = canonicalizeUrl(resolvedUrl, normalizeOptions);
         if (normalized) {
           links.add(normalized);
@@ -183,7 +209,7 @@ function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: Norm
         const href = urlMatch[1].trim();
         try {
           const resolvedUrl = new URL(href, effectiveBaseUrl).href;
-          if (shouldCrawlUrl(resolvedUrl, normalizeOptions.baseUrl.hostname, normalizeOptions)) {
+          if (shouldCrawlUrl(resolvedUrl, originalBaseHostname, normalizeOptions)) {
             const normalized = canonicalizeUrl(resolvedUrl, normalizeOptions);
             if (normalized) {
               links.add(normalized);
@@ -196,28 +222,52 @@ function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: Norm
     }
   });
 
-  // Extract from JavaScript-rendered navigation (enhanced patterns)
+  // Extract from JavaScript-rendered navigation (enhanced patterns for SPAs)
   // WHY: Some sites have URLs in JavaScript that might be rendered client-side
   // This is a basic extraction - full JS parsing would require a browser
   const jsUrlPatterns = [
     // Standard href assignments
     /href\s*[:=]\s*["']([^"']+)["']/gi,
     /url\s*[:=]\s*["']([^"']+)["']/gi,
+    /path\s*[:=]\s*["']([^"']+)["']/gi,
+    /route\s*[:=]\s*["']([^"']+)["']/gi,
     // Location assignments
     /location\.href\s*=\s*["']([^"']+)["']/gi,
     /window\.location\s*=\s*["']([^"']+)["']/gi,
     /location\.replace\s*\(\s*["']([^"']+)["']/gi,
     /location\.assign\s*\(\s*["']([^"']+)["']/gi,
-    // Router patterns (React Router, Vue Router, etc.)
+    /location\.pathname\s*=\s*["']([^"']+)["']/gi,
+    // Router patterns (React Router, Vue Router, Next.js, etc.)
     /router\.(push|replace)\s*\(\s*["']([^"']+)["']/gi,
+    /router\.(push|replace)\s*\(\s*\{[^}]*path\s*[:=]\s*["']([^"']+)["']/gi,
     /navigate\s*\(\s*["']([^"']+)["']/gi,
+    /navigate\s*\(\s*\{[^}]*to\s*[:=]\s*["']([^"']+)["']/gi,
     /history\.(push|replace)\s*\(\s*["']([^"']+)["']/gi,
-    // URL patterns in data attributes
+    /history\.(push|replace)\s*\(\s*\{[^}]*pathname\s*[:=]\s*["']([^"']+)["']/gi,
+    // Next.js specific patterns
+    /Link\s+.*href\s*=\s*["']([^"']+)["']/gi,
+    /useRouter\(\)\.push\s*\(\s*["']([^"']+)["']/gi,
+    // React Router specific
+    /<Link[^>]+to\s*=\s*["']([^"']+)["']/gi,
+    /<NavLink[^>]+to\s*=\s*["']([^"']+)["']/gi,
+    // Vue Router specific
+    /this\.\$router\.(push|replace)\s*\(\s*["']([^"']+)["']/gi,
+    /router-link.*to\s*=\s*["']([^"']+)["']/gi,
+    // URL patterns in data attributes (already handled separately, but include for completeness)
     /data-[\w-]+-url\s*=\s*["']([^"']+)["']/gi,
-    // JSON data structures
+    /data-[\w-]+-href\s*=\s*["']([^"']+)["']/gi,
+    /data-[\w-]+-path\s*=\s*["']([^"']+)["']/gi,
+    // JSON data structures (routes, navigation, etc.)
     /["']url["']\s*:\s*["']([^"']+)["']/gi,
     /["']href["']\s*:\s*["']([^"']+)["']/gi,
     /["']link["']\s*:\s*["']([^"']+)["']/gi,
+    /["']path["']\s*:\s*["']([^"']+)["']/gi,
+    /["']route["']\s*:\s*["']([^"']+)["']/gi,
+    /["']pathname["']\s*:\s*["']([^"']+)["']/gi,
+    /["']to["']\s*:\s*["']([^"']+)["']/gi,
+    // Array of routes
+    /\[[^\]]*\{[^}]*path\s*[:=]\s*["']([^"']+)["']/gi,
+    /\[[^\]]*\{[^}]*url\s*[:=]\s*["']([^"']+)["']/gi,
   ];
 
   $("script").each((_, element) => {
@@ -252,27 +302,48 @@ function extractLinksFromHtml(html: string, baseUrl: URL, normalizeOptions: Norm
   });
 
   // Extract from data attributes that might contain URLs
-  // WHY: Some frameworks store URLs in data attributes
-  $("[data-url], [data-href], [data-link], [data-path]").each((_, element) => {
-    const urlAttr = $(element).attr("data-url") || 
-                    $(element).attr("data-href") || 
-                    $(element).attr("data-link") ||
-                    $(element).attr("data-path");
-    if (urlAttr && urlAttr.trim()) {
-      try {
-        const resolvedUrl = new URL(urlAttr, effectiveBaseUrl).href;
-        if (shouldCrawlUrl(resolvedUrl, normalizeOptions.baseUrl.hostname, normalizeOptions)) {
-          const normalized = canonicalizeUrl(resolvedUrl, normalizeOptions);
-          if (normalized) {
-            links.add(normalized);
+  // WHY: Some frameworks store URLs in data attributes (React, Vue, etc.)
+  const dataAttrSelectors = [
+    "[data-url]", "[data-href]", "[data-link]", "[data-path]",
+    "[data-route]", "[data-to]", "[data-navigate]", "[data-navigation]",
+    "[data-page]", "[data-page-url]", "[data-page-path]",
+  ];
+  
+  dataAttrSelectors.forEach(selector => {
+    $(selector).each((_, element) => {
+      const urlAttr = $(element).attr("data-url") || 
+                      $(element).attr("data-href") || 
+                      $(element).attr("data-link") ||
+                      $(element).attr("data-path") ||
+                      $(element).attr("data-route") ||
+                      $(element).attr("data-to") ||
+                      $(element).attr("data-navigate") ||
+                      $(element).attr("data-navigation") ||
+                      $(element).attr("data-page") ||
+                      $(element).attr("data-page-url") ||
+                      $(element).attr("data-page-path");
+      if (urlAttr && urlAttr.trim()) {
+        try {
+          const resolvedUrl = new URL(urlAttr, effectiveBaseUrl).href;
+          if (shouldCrawlUrl(resolvedUrl, originalBaseHostname, normalizeOptions)) {
+            const normalized = canonicalizeUrl(resolvedUrl, normalizeOptions);
+            if (normalized) {
+              links.add(normalized);
+              if (debug && links.size <= 10) {
+                console.log(`[LinkExtraction] Added link from data attribute: ${urlAttr} -> ${normalized}`);
+              }
+            }
           }
+        } catch {
+          // Invalid URL, skip
         }
-      } catch {
-        // Invalid URL, skip
       }
-    }
+    });
   });
 
+  if (debug) {
+    console.log(`[LinkExtraction] Total unique links extracted: ${links.size}`);
+  }
   return links;
 }
 
@@ -422,17 +493,23 @@ export async function crawlWebsite(
   // STEP 1: Try to fetch sitemap.xml (PRIMARY SOURCE)
   // WHY: Sitemaps are the most reliable way to discover all pages on modern sites
   if (debug) console.log(`[Crawler] Discovering sitemap for ${baseUrl.hostname}...`);
-  const sitemapUrl = await discoverSitemap(baseUrl);
+  const sitemapUrl = await discoverSitemap(baseUrl, debug);
   
   if (sitemapUrl) {
     statistics.sitemapFound = true;
     statistics.sitemapUrl = sitemapUrl;
-    if (debug) console.log(`[Crawler] Found sitemap: ${sitemapUrl}`);
+    if (debug) console.log(`[Crawler] ✓ Found sitemap: ${sitemapUrl}`);
     
     try {
-      const sitemapUrls = await parseSitemap(sitemapUrl);
+      if (debug) console.log(`[Crawler] Parsing sitemap: ${sitemapUrl}`);
+      const sitemapUrls = await parseSitemap(sitemapUrl, debug);
       statistics.sitemapUrlCount = sitemapUrls.length;
-      if (debug) console.log(`[Crawler] Extracted ${sitemapUrls.length} URLs from sitemap`);
+      if (debug) {
+        console.log(`[Crawler] ✓ Extracted ${sitemapUrls.length} URLs from sitemap`);
+        if (sitemapUrls.length > 0 && sitemapUrls.length <= 10) {
+          console.log(`[Crawler] Sample sitemap URLs:`, sitemapUrls.slice(0, 5));
+        }
+      }
       
       // Add sitemap URLs to queue (PRIORITIZED)
       // WHY: Sitemap URLs are pre-validated and represent all pages the site wants indexed
@@ -440,14 +517,31 @@ export async function crawlWebsite(
       let addedFromSitemap = 0;
       const sitemapUrlsToAdd: string[] = [];
       
+      let sitemapUrlsFiltered = 0;
       for (const url of sitemapUrls) {
-        if (shouldCrawlUrl(url, hostname, normalizeOptions)) {
+        if (shouldCrawlUrl(url, hostname, normalizeOptions, debug)) {
           const normalized = canonicalizeUrl(url, normalizeOptions);
           if (normalized && !visited.has(normalized)) {
             sitemapUrlsToAdd.push(normalized);
             visited.add(normalized);
+            if (debug && sitemapUrlsToAdd.length <= 5) {
+              console.log(`[Crawler] Added sitemap URL: ${url} -> ${normalized}`);
+            }
+          } else {
+            if (debug && sitemapUrlsFiltered < 5) {
+              console.log(`[Crawler] Skipped sitemap URL (already visited or failed normalization): ${url}`);
+            }
+            sitemapUrlsFiltered++;
           }
+        } else {
+          if (debug && sitemapUrlsFiltered < 5) {
+            console.log(`[Crawler] Filtered sitemap URL (not crawlable): ${url}`);
+          }
+          sitemapUrlsFiltered++;
         }
+      }
+      if (debug && sitemapUrlsFiltered > 0) {
+        console.log(`[Crawler] Filtered ${sitemapUrlsFiltered} sitemap URLs (not crawlable or duplicates)`);
       }
       
       // Limit sitemap URLs to maxPages, but prioritize them
@@ -458,10 +552,11 @@ export async function crawlWebsite(
       }
       
       if (debug) {
-        console.log(`[Crawler] Added ${addedFromSitemap} URLs from sitemap to queue (${sitemapUrlsToAdd.length} total found)`);
+        console.log(`[Crawler] ✓ Added ${addedFromSitemap} URLs from sitemap to queue (${sitemapUrlsToAdd.length} total valid, ${sitemapUrls.length} total in sitemap)`);
         if (sitemapUrlsToAdd.length > maxPages) {
-          console.log(`[Crawler] Limited sitemap URLs to ${maxPages} due to page limit`);
+          console.log(`[Crawler] ⚠ Limited sitemap URLs to ${maxPages} due to page limit`);
         }
+        console.log(`[Crawler] Queue size after sitemap: ${urlQueue.length}, Results: ${results.length}`);
       }
     } catch (error: any) {
       // Fail gracefully - continue with HTML crawling if sitemap fails
@@ -480,14 +575,29 @@ export async function crawlWebsite(
     // Prepend root URL to prioritize it
     urlQueue.unshift(canonicalRoot);
     visited.add(canonicalRoot);
+    if (debug) {
+      console.log(`[Crawler] ✓ Added root URL to queue: ${canonicalRoot}`);
+    }
+  } else if (debug) {
+    if (visited.has(canonicalRoot)) {
+      console.log(`[Crawler] Root URL already in queue/visited: ${canonicalRoot}`);
+    } else {
+      console.log(`[Crawler] Skipped root URL - would exceed page limit`);
+    }
   }
 
   // STEP 3: Crawl pages (breadth-first)
   // WHY: Breadth-first ensures we discover pages level by level
+  let iteration = 0;
   while (urlQueue.length > 0 && results.length < maxPages) {
+    iteration++;
     // Process a batch of URLs concurrently
     const batchSize = Math.min(maxConcurrent, urlQueue.length, maxPages - results.length);
     const batch = urlQueue.splice(0, batchSize);
+    
+    if (debug) {
+      console.log(`[Crawler] Iteration ${iteration}: Processing batch of ${batch.length} URLs (Queue: ${urlQueue.length}, Results: ${results.length}/${maxPages})`);
+    }
     
     // Use Promise.allSettled to handle partial batch failures gracefully
     const batchPromises = batch.map(url => fetchPage(url, timeout));
@@ -500,14 +610,21 @@ export async function crawlWebsite(
       if (result.status === "rejected") {
         const errorMsg = `Failed to fetch ${originalUrl}: ${result.reason?.message || "Unknown error"}`;
         statistics.crawlErrors.push(errorMsg);
-        if (debug) console.warn(`[Crawler] ${errorMsg}`);
+        if (debug) console.warn(`[Crawler] ✗ ${errorMsg}`);
         continue;
       }
 
       const page = result.value;
       if (!page) {
         // Page fetch returned null (non-HTML content, client error, etc.)
+        if (debug) {
+          console.log(`[Crawler] Skipped ${originalUrl} - fetch returned null (non-HTML or error)`);
+        }
         continue;
+      }
+      
+      if (debug) {
+        console.log(`[Crawler] ✓ Fetched ${originalUrl} -> ${page.url} (status: ${page.statusCode})`);
       }
 
       // Canonicalize the final URL (after redirects)
@@ -534,7 +651,7 @@ export async function crawlWebsite(
         if (results.length < maxPages && urlQueue.length + results.length < maxPages) {
           try {
             const pageUrl = new URL(canonicalUrl);
-            const htmlLinks = extractLinksFromHtml(page.html, pageUrl, normalizeOptions);
+            const htmlLinks = extractLinksFromHtml(page.html, pageUrl, normalizeOptions, debug);
             const newLinksCount = htmlLinks.size;
             statistics.htmlDiscoveredCount += newLinksCount;
 
@@ -543,25 +660,33 @@ export async function crawlWebsite(
             }
 
             let addedFromHtml = 0;
+            let skippedFromHtml = 0;
             const remainingSlots = maxPages - results.length - urlQueue.length;
             
             // Prioritize adding links if we have room
+            // Note: Links from extractLinksFromHtml are already normalized, so we don't need to normalize again
             for (const link of htmlLinks) {
               if (addedFromHtml >= remainingSlots) {
+                if (debug) {
+                  console.log(`[Crawler] Stopped adding HTML links - reached remaining slots limit (${remainingSlots})`);
+                }
                 break; // Stop if we've filled available slots
               }
               
-              const normalizedLink = canonicalizeUrl(link, normalizeOptions);
-              if (normalizedLink && 
-                  !visited.has(normalizedLink) && 
-                  !urlQueue.includes(normalizedLink)) {
-                urlQueue.push(normalizedLink);
+              // Link is already normalized from extractLinksFromHtml, so use it directly
+              if (!visited.has(link) && !urlQueue.includes(link)) {
+                urlQueue.push(link);
                 addedFromHtml++;
+                if (debug && addedFromHtml <= 5) {
+                  console.log(`[Crawler] Added HTML link to queue: ${link}`);
+                }
+              } else {
+                skippedFromHtml++;
               }
             }
             
-            if (debug && addedFromHtml > 0) {
-              console.log(`[Crawler] Added ${addedFromHtml} new URLs from HTML to queue`);
+            if (debug) {
+              console.log(`[Crawler] Added ${addedFromHtml} new URLs from HTML to queue (${skippedFromHtml} skipped - already visited/queued)`);
             }
           } catch (error: any) {
             // Continue crawling even if link extraction fails

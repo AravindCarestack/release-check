@@ -164,6 +164,15 @@ export async function GET(request: NextRequest) {
           present: sitemapPresent,
           url: sitemapUrl,
         },
+        crawlStatistics: {
+          sitemapFound: crawlStatistics.sitemapFound,
+          sitemapUrl: crawlStatistics.sitemapUrl,
+          sitemapUrlCount: crawlStatistics.sitemapUrlCount,
+          htmlDiscoveredCount: crawlStatistics.htmlDiscoveredCount,
+          totalDiscovered: crawlStatistics.totalDiscovered,
+          totalCrawled: crawlStatistics.totalCrawled,
+          crawlErrors: crawlStatistics.crawlErrors,
+        },
         pages: pagesWithSitemap,
       });
     }

@@ -185,11 +185,15 @@ export function canonicalizeUrl(
 export function shouldCrawlUrl(
   url: string | URL,
   baseHostname: string,
-  options: NormalizeOptions
+  options: NormalizeOptions,
+  debug: boolean = false
 ): boolean {
   try {
     const normalized = canonicalizeUrl(url, options);
-    if (!normalized) return false;
+    if (!normalized) {
+      if (debug) console.log(`[shouldCrawlUrl] ✗ Failed to normalize: ${url}`);
+      return false;
+    }
 
     const urlObj = new URL(normalized);
     const normalizedHostname = urlObj.hostname.toLowerCase();
@@ -202,6 +206,9 @@ export function shouldCrawlUrl(
     const baseHostnameNoWww = baseHostnameLower.replace(/^www\./, "");
     
     if (normalizedHostnameNoWww !== baseHostnameNoWww) {
+      if (debug) {
+        console.log(`[shouldCrawlUrl] ✗ Different hostname: ${normalizedHostname} (base: ${baseHostname})`);
+      }
       return false;
     }
 
@@ -216,11 +223,20 @@ export function shouldCrawlUrl(
     ];
 
     if (skipExtensions.some(ext => lowerPath.endsWith(ext))) {
+      if (debug) {
+        console.log(`[shouldCrawlUrl] ✗ Skipped file extension: ${url}`);
+      }
       return false;
     }
 
+    if (debug) {
+      console.log(`[shouldCrawlUrl] ✓ Should crawl: ${url} -> ${normalized}`);
+    }
     return true;
-  } catch {
+  } catch (error) {
+    if (debug) {
+      console.warn(`[shouldCrawlUrl] ✗ Error checking URL: ${url}`, error);
+    }
     return false;
   }
 }
