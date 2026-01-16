@@ -13,10 +13,10 @@ export default function ScoreBadge({ count, label, color }: ScoreBadgeProps) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className={`${colorClasses[color]} px-3 py-1 rounded-full text-sm font-semibold`}>
+      <span className={`${colorClasses[color]} px-3 py-1 rounded-md text-sm font-medium`}>
         {count}
       </span>
-      <span className="text-gray-700 dark:text-gray-300 font-medium">{label}</span>
+      <span className="text-gray-700 font-medium text-sm">{label}</span>
     </div>
   );
 }
