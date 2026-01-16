@@ -16,6 +16,7 @@ export interface PageReport {
   meta: {
     title: string | null;
     description: string | null;
+    keywords: string | null;
     robots: string | null;
     canonical: string | null;
   };
@@ -35,6 +36,7 @@ export interface PageReport {
     valid: boolean;
     count: number;
     errors: string[];
+    types: string[];
   };
   sitemap: {
     present: boolean;
@@ -47,8 +49,9 @@ export interface PageReport {
 /**
  * Validates JSON-LD structured data
  */
-function validateJsonLd(html: string): { valid: boolean; count: number; errors: string[] } {
+function validateJsonLd(html: string): { valid: boolean; count: number; errors: string[]; types: string[] } {
   const errors: string[] = [];
+  const types: string[] = [];
   let count = 0;
   let valid = true;
 
@@ -87,8 +90,36 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
   });
 
   if (jsonLdScripts.length === 0) {
-    return { valid: false, count: 0, errors: [] };
+    return { valid: false, count: 0, errors: [], types: [] };
   }
+
+  // Helper function to extract types from JSON-LD object
+  const extractTypes = (obj: any, prefix: string = ""): void => {
+    if (!obj || typeof obj !== "object") return;
+    
+    if (Array.isArray(obj)) {
+      obj.forEach((item, idx) => extractTypes(item, `${prefix}[${idx}]`));
+    } else {
+      // Extract @type
+      if (obj["@type"]) {
+        const typeValue = obj["@type"];
+        if (typeof typeValue === "string") {
+          types.push(typeValue);
+        } else if (Array.isArray(typeValue)) {
+          typeValue.forEach(t => {
+            if (typeof t === "string") types.push(t);
+          });
+        }
+      }
+      
+      // Recursively check nested objects
+      Object.keys(obj).forEach(key => {
+        if (key !== "@type" && typeof obj[key] === "object" && obj[key] !== null) {
+          extractTypes(obj[key], prefix ? `${prefix}.${key}` : key);
+        }
+      });
+    }
+  };
 
   for (const jsonContent of jsonLdScripts) {
     count++;
@@ -101,6 +132,9 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
       
       // Try to parse the JSON
       const parsed = JSON.parse(cleanedContent);
+      
+      // Extract types
+      extractTypes(parsed);
       
       // Basic validation - check if it's an object or array
       if (typeof parsed !== "object" || parsed === null) {
@@ -156,7 +190,10 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
     valid = true;
   }
 
-  return { valid, count, errors };
+  // Remove duplicate types
+  const uniqueTypes = Array.from(new Set(types));
+
+  return { valid, count, errors, types: uniqueTypes };
 }
 
 /**
@@ -194,6 +231,7 @@ export function analyzePage(html: string, url: string, baseUrl?: URL): PageRepor
   // Analyze meta tags
   const title = $("title").text().trim() || null;
   const description = $('meta[name="description"]').attr("content") || null;
+  const keywords = $('meta[name="keywords"]').attr("content") || null;
   const robots = $('meta[name="robots"]').attr("content") || null;
   const canonical = $('link[rel="canonical"]').attr("href") || null;
 
@@ -297,6 +335,7 @@ export function analyzePage(html: string, url: string, baseUrl?: URL): PageRepor
     meta: {
       title,
       description,
+      keywords,
       robots,
       canonical,
     },
@@ -316,6 +355,7 @@ export function analyzePage(html: string, url: string, baseUrl?: URL): PageRepor
       valid: jsonLdResult.valid,
       count: jsonLdResult.count,
       errors: jsonLdResult.errors,
+      types: jsonLdResult.types,
     },
     sitemap: {
       present: sitemapPresent,

@@ -64,48 +64,45 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 /**
  * Extracts locale information from a URL
+ * Detects country based on URL patterns:
+ * - If URL contains "en-au" → Australia
+ * - If URL contains "en-gb" → UK
+ * - Otherwise → US
  */
 export function detectLocale(url: string): LocaleInfo {
   try {
-    const urlObj = new URL(url);
-    const pathname = urlObj.pathname.toLowerCase();
+    const urlLower = url.toLowerCase();
     
-    // Try ISO locale format first (e.g., /en-GB/, /en-AU/)
-    const isoMatch = pathname.match(/^\/([a-z]{2})-([A-Z]{2})(\/|$)/);
-    if (isoMatch) {
-      const [, lang, country] = isoMatch;
-      const languageName = LANGUAGE_NAMES[lang] || lang.toUpperCase();
-      const countryName = COUNTRY_NAMES[country] || country;
+    // Check for en-au pattern anywhere in the URL
+    if (urlLower.includes("en-au")) {
       return {
-        locale: `${lang}-${country}`,
-        region: country,
-        displayName: `${languageName} (${countryName})`,
+        locale: "en-AU",
+        region: "AU",
+        displayName: "Australia",
       };
     }
     
-    // Try two-letter language code (e.g., /en/, /fr/)
-    const langMatch = pathname.match(/^\/([a-z]{2})(\/|$)/);
-    if (langMatch) {
-      const [, lang] = langMatch;
-      const languageName = LANGUAGE_NAMES[lang] || lang.toUpperCase();
+    // Check for en-gb pattern anywhere in the URL
+    if (urlLower.includes("en-gb")) {
       return {
-        locale: lang,
-        region: lang,
-        displayName: languageName,
+        locale: "en-GB",
+        region: "GB",
+        displayName: "United Kingdom",
       };
     }
     
-    // Default: no locale detected
+    // Default: US version
     return {
-      locale: "default",
-      region: "default",
-      displayName: "Default",
+      locale: "en-US",
+      region: "US",
+      displayName: "United States",
     };
   } catch {
+    // Default: US version on error
     return {
-      locale: "default",
-      region: "default",
-      displayName: "Default",
+      locale: "en-US",
+      region: "US",
+      displayName: "United States",
     };
   }
 }
@@ -133,7 +130,7 @@ export function groupPagesByLocale<T extends { url: string }>(
 }
 
 /**
- * Sorts locale groups by display name, with "default" always first
+ * Sorts locale groups by display name, with "en-US" (US) always first
  */
 export function sortLocaleGroups(
   groups: Map<string, { locale: LocaleInfo; pages: any[] }>
@@ -141,9 +138,9 @@ export function sortLocaleGroups(
   const sorted = Array.from(groups.values());
   
   sorted.sort((a, b) => {
-    // Default always comes first
-    if (a.locale.locale === "default") return -1;
-    if (b.locale.locale === "default") return 1;
+    // US (en-US) always comes first
+    if (a.locale.locale === "en-US") return -1;
+    if (b.locale.locale === "en-US") return 1;
     
     // Then sort by display name
     return a.locale.displayName.localeCompare(b.locale.displayName);

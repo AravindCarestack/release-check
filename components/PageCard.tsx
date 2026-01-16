@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import StatusBadge from "./StatusBadge";
 import type { PageReport } from "@/lib/page-analyzer";
 
@@ -6,6 +9,7 @@ interface PageCardProps {
 }
 
 export default function PageCard({ page }: PageCardProps) {
+  const [jsonLdExpanded, setJsonLdExpanded] = useState(false);
   const CheckItem = ({ label, hasValue }: { label: string; hasValue: boolean }) => (
     <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
       <span className="text-sm text-gray-700">{label}</span>
@@ -89,7 +93,23 @@ export default function PageCard({ page }: PageCardProps) {
         </div>
         <div>
           <CheckItem label="Title" hasValue={!!page.meta.title} />
+          {page.meta.title && (
+            <div className="py-2 border-b border-gray-100 text-xs text-gray-600 bg-gray-50 p-2 rounded break-words">
+              <span className="font-medium">Title:</span> {page.meta.title}
+            </div>
+          )}
           <CheckItem label="Description" hasValue={!!page.meta.description} />
+          {page.meta.description && (
+            <div className="py-2 border-b border-gray-100 text-xs text-gray-600 bg-gray-50 p-2 rounded break-words">
+              <span className="font-medium">Description:</span> {page.meta.description}
+            </div>
+          )}
+          <CheckItem label="Keywords" hasValue={!!page.meta.keywords} />
+          {page.meta.keywords && (
+            <div className="py-2 border-b border-gray-100 text-xs text-gray-600 bg-gray-50 p-2 rounded break-words">
+              <span className="font-medium">Keywords:</span> {page.meta.keywords}
+            </div>
+          )}
           <CheckItem label="Robots" hasValue={!!page.meta.robots && !page.meta.robots.toLowerCase().includes("noindex")} />
           <CheckItem label="Canonical" hasValue={!!page.meta.canonical} />
         </div>
@@ -104,6 +124,19 @@ export default function PageCard({ page }: PageCardProps) {
           <CheckItem label="og:title" hasValue={!!page.og.title} />
           <CheckItem label="og:description" hasValue={!!page.og.description} />
           <CheckItem label="og:image" hasValue={!!page.og.image} />
+          {page.og.image && (
+            <div className="py-2 border-b border-gray-100">
+              <div className="text-xs text-gray-700 mb-1 font-medium">OG Image:</div>
+              <img 
+                src={page.og.image} 
+                alt="Open Graph" 
+                className="w-full h-auto rounded border border-gray-200 max-h-48 object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -120,7 +153,7 @@ export default function PageCard({ page }: PageCardProps) {
         </div>
       </div>
 
-      {/* JSON-LD Check */}
+      {/* JSON-LD Check - Last field, expandable */}
       <div className="mb-4">
         <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
           JSON-LD Structured Data
@@ -134,6 +167,33 @@ export default function PageCard({ page }: PageCardProps) {
                 <span className="text-sm text-gray-700">Count: </span>
                 <span className="text-sm font-semibold text-gray-900">{page.jsonLd.count}</span>
               </div>
+              {page.jsonLd.types.length > 0 && (
+                <div className="py-2 border-b border-gray-100">
+                  <button
+                    onClick={() => setJsonLdExpanded(!jsonLdExpanded)}
+                    className="flex items-center justify-between w-full text-left text-sm text-gray-700 hover:text-gray-900"
+                  >
+                    <span className="font-medium">
+                      Types ({page.jsonLd.types.length}):
+                    </span>
+                    <span className="text-xs text-gray-500">
+                      {jsonLdExpanded ? "▼" : "▶"}
+                    </span>
+                  </button>
+                  {jsonLdExpanded && (
+                    <div className="mt-2 space-y-1">
+                      {page.jsonLd.types.map((type, idx) => (
+                        <div
+                          key={idx}
+                          className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 break-words"
+                        >
+                          {type}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {page.jsonLd.errors.length > 0 && (
                 <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
                   Errors: {page.jsonLd.errors.join(", ")}

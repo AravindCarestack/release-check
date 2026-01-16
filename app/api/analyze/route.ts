@@ -35,10 +35,10 @@ async function analyzePagesConcurrently(
             h1Texts: [],
             hasSingleH1: false,
             headingCounts: { h2: 0, h3: 0, h4: 0, h5: 0, h6: 0 },
-            meta: { title: null, description: null, robots: null, canonical: null },
+            meta: { title: null, description: null, keywords: null, robots: null, canonical: null },
             og: { title: null, description: null, image: null },
             twitter: { card: null, title: null, description: null, image: null },
-            jsonLd: { present: false, valid: false, count: 0, errors: [] },
+            jsonLd: { present: false, valid: false, count: 0, errors: [], types: [] },
             sitemap: { present: false, url: null },
             issues: ["Failed to analyze page"],
             status: "fail" as const,
@@ -85,15 +85,21 @@ export async function GET(request: NextRequest) {
       }
       const baseUrl = new URL(normalizedUrl);
 
-      // Check for sitemap at site level
+      // Check for sitemap at site level and fetch robots.txt
       let sitemapUrl: string | null = null;
       let sitemapPresent = false;
+      let robotsTxtContent: string | null = null;
+      let robotsTxtPresent = false;
       try {
         const robotsUrl = new URL("/robots.txt", baseUrl).href;
         const axios = (await import("axios")).default;
         const robotsResponse = await axios.get(robotsUrl, { timeout: 5000, validateStatus: () => true });
         if (robotsResponse.status === 200) {
-          const sitemapMatch = robotsResponse.data.match(/Sitemap:\s*(.+)/i);
+          robotsTxtPresent = true;
+          robotsTxtContent = typeof robotsResponse.data === "string" 
+            ? robotsResponse.data 
+            : String(robotsResponse.data);
+          const sitemapMatch = robotsTxtContent.match(/Sitemap:\s*(.+)/i);
           if (sitemapMatch) {
             sitemapPresent = true;
             sitemapUrl = sitemapMatch[1].trim();
@@ -166,6 +172,10 @@ export async function GET(request: NextRequest) {
         sitemap: {
           present: sitemapPresent,
           url: sitemapUrl,
+        },
+        robotsTxt: {
+          present: robotsTxtPresent,
+          content: robotsTxtContent,
         },
         crawlStatistics: {
           sitemapFound: crawlStatistics.sitemapFound,

@@ -59,13 +59,11 @@ export default function PageGrid({ pages }: PageGridProps) {
     return sortLocaleGroups(groups);
   }, [statusFilteredPages]);
 
-  // Check if we have multiple locales or any non-default locale
+  // Check if we have multiple locales (countries)
   const hasMultipleLocales = useMemo(() => {
     if (availableLocales.length === 0) return false;
-    // Show dropdown if we have multiple locales OR if we have at least one non-default locale
-    if (availableLocales.length > 1) return true;
-    // Show if we have one locale that's not "default"
-    return availableLocales.length === 1 && availableLocales[0]?.locale.locale !== "default";
+    // Show dropdown if we have multiple countries
+    return availableLocales.length > 1;
   }, [availableLocales]);
 
   return (

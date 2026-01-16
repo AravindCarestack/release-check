@@ -15,6 +15,10 @@ interface CrawlResult {
     present: boolean;
     url: string | null;
   };
+  robotsTxt?: {
+    present: boolean;
+    content: string | null;
+  };
   pages: PageReport[];
 }
 
@@ -36,7 +40,7 @@ function ResultsContent() {
     return {
       groups: sorted,
       count: groups.size,
-      hasMultiple: groups.size > 1 || (groups.size === 1 && !groups.has("default")),
+      hasMultiple: groups.size > 1,
     };
   }, [crawlResult?.pages]);
 
@@ -297,6 +301,31 @@ function ResultsContent() {
                 )}
               </div>
             </div>
+
+            {/* Robots.txt Display */}
+            {crawlResult.robotsTxt && (
+              <div className="mb-6 bg-white rounded-md border border-gray-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Robots.txt
+                  </h2>
+                  <span className={`text-sm font-medium px-3 py-1 rounded-md ${
+                    crawlResult.robotsTxt.present 
+                      ? "bg-green-100 text-green-700" 
+                      : "bg-red-100 text-red-700"
+                  }`}>
+                    {crawlResult.robotsTxt.present ? "✓ Present" : "✗ Not Found"}
+                  </span>
+                </div>
+                {crawlResult.robotsTxt.present && crawlResult.robotsTxt.content && (
+                  <div className="mt-3">
+                    <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-words font-mono">
+                      {crawlResult.robotsTxt.content}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Page Grid */}
             <PageGrid pages={crawlResult.pages} />
