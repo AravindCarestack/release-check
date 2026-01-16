@@ -232,7 +232,7 @@ export async function discoverSitemap(baseUrl: URL, debug: boolean = false): Pro
       
       // Try each sitemap URL found in robots.txt
       for (const match of sitemapMatches) {
-        const sitemapUrl = match[1].trim();
+        const sitemapUrl = (match as RegExpMatchArray)[1].trim();
         // Remove comments and whitespace
         const cleanUrl = sitemapUrl.split("#")[0].trim();
         if (!cleanUrl) continue;

@@ -579,7 +579,7 @@ export async function crawlWebsite(
       console.log(`[Crawler] ✓ Added root URL to queue: ${canonicalRoot}`);
     }
   } else if (debug) {
-    if (visited.has(canonicalRoot)) {
+    if (canonicalRoot && visited.has(canonicalRoot)) {
       console.log(`[Crawler] Root URL already in queue/visited: ${canonicalRoot}`);
     } else {
       console.log(`[Crawler] Skipped root URL - would exceed page limit`);

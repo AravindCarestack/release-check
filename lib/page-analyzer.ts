@@ -246,7 +246,7 @@ export function analyzePage(html: string, url: string, baseUrl?: URL): PageRepor
 
   // Analyze JSON-LD
   const jsonLdResult = validateJsonLd(html);
-  if (!jsonLdResult.present) {
+  if (jsonLdResult.count === 0) {
     issues.push("No JSON-LD structured data found");
   } else if (!jsonLdResult.valid) {
     issues.push(`Invalid JSON-LD: ${jsonLdResult.errors.join(", ")}`);
