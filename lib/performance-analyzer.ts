@@ -271,7 +271,7 @@ function checkImageOptimization(
     return {
       status: "warn",
       message: `Image optimization could be improved`,
-      value: { webpPercentage, lazyLoadPercentage },
+      value: `${webpPercentage.toFixed(0)}% WebP, ${lazyLoadPercentage.toFixed(0)}% lazy loaded`,
       recommendation: "Use WebP/AVIF format and lazy loading for better performance",
     };
   }
@@ -280,7 +280,7 @@ function checkImageOptimization(
   return {
     status: "pass",
     message: "Images are well optimized",
-    value: { webpPercentage, lazyLoadPercentage },
+    value: `${webpPercentage.toFixed(0)}% WebP, ${lazyLoadPercentage.toFixed(0)}% lazy loaded`,
   };
 }
 
@@ -298,7 +298,7 @@ function checkRenderBlockingResources(
     return {
       status: "warn",
       message: `Multiple render-blocking resources detected`,
-      value: { blockingScripts, blockingStyles },
+      value: `${blockingScripts} scripts, ${blockingStyles} stylesheets`,
       recommendation: "Use async/defer for scripts and inline critical CSS to reduce render-blocking",
     };
   }
@@ -307,7 +307,7 @@ function checkRenderBlockingResources(
   return {
     status: "pass",
     message: "Render-blocking resources are optimized",
-    value: { blockingScripts, blockingStyles },
+    value: `${blockingScripts} scripts, ${blockingStyles} stylesheets`,
   };
 }
 
