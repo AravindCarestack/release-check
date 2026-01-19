@@ -253,8 +253,8 @@ function checkSemanticHtml(
     warnings.push("No semantic HTML elements found, excessive use of div/span");
     return {
       status: "warn",
-      message: "No semantic HTML elements found",
-      value: { semanticElements: 0, divs: divCount, spans: spanCount },
+      message: `No semantic HTML elements found (${divCount} divs, ${spanCount} spans)`,
+      value: 0,
       recommendation: "Use semantic HTML elements (nav, main, article, etc.) for better accessibility",
     };
   }
