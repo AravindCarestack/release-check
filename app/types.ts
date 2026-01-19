@@ -10,6 +10,11 @@ export interface SEOAnalysisResult {
     robots: RobotsCheck;
     links: LinksCheck;
     technical: TechnicalCheck;
+    performance?: PerformanceCheck;
+    security?: SecurityCheck;
+    accessibility?: AccessibilityCheck;
+    analytics?: AnalyticsCheck;
+    caching?: CachingCheck;
   };
 }
 
@@ -70,4 +75,51 @@ export interface CheckResult {
   message: string;
   value?: string | number | boolean;
   recommendation?: string;
+}
+
+export interface PerformanceCheck {
+  pageLoadTime: CheckResult;
+  ttfb: CheckResult;
+  domContentLoaded: CheckResult;
+  totalPageSize: CheckResult;
+  imageOptimization: CheckResult;
+  renderBlockingResources: CheckResult;
+  fontLoading: CheckResult;
+  thirdPartyScripts: CheckResult;
+}
+
+export interface SecurityCheck {
+  contentSecurityPolicy: CheckResult;
+  xFrameOptions: CheckResult;
+  xContentTypeOptions: CheckResult;
+  strictTransportSecurity: CheckResult;
+  referrerPolicy: CheckResult;
+  permissionsPolicy: CheckResult;
+  sslCertificate: CheckResult;
+  mixedContent: CheckResult;
+  cookieSecurity: CheckResult;
+}
+
+export interface AccessibilityCheck {
+  altText: CheckResult;
+  formLabels: CheckResult;
+  ariaAttributes: CheckResult;
+  headingHierarchy: CheckResult;
+  semanticHtml: CheckResult;
+  keyboardNavigation: CheckResult;
+  focusIndicators: CheckResult;
+}
+
+export interface AnalyticsCheck {
+  googleAnalytics: CheckResult;
+  googleTagManager: CheckResult;
+  facebookPixel: CheckResult;
+  trackingConsent: CheckResult;
+}
+
+export interface CachingCheck {
+  cacheControl: CheckResult;
+  etag: CheckResult;
+  cdnUsage: CheckResult;
+  staticAssetCaching: CheckResult;
 }

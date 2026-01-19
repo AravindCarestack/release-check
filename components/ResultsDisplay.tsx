@@ -13,7 +13,7 @@ interface ResultsDisplayProps {
 export default function ResultsDisplay({ result }: ResultsDisplayProps) {
   const router = useRouter();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["metaTags", "openGraph", "twitter", "robots", "links", "technical"])
+    new Set(["metaTags", "robots", "links", "technical"])
   );
 
   const toggleSection = (section: string) => {
@@ -190,6 +190,56 @@ export default function ResultsDisplay({ result }: ResultsDisplayProps) {
               expanded={expandedSections.has("technical")}
               onToggle={toggleSection}
             />
+
+            {result.details.performance && (
+              <CheckSection
+                title="Performance"
+                section="performance"
+                checks={result.details.performance}
+                expanded={expandedSections.has("performance")}
+                onToggle={toggleSection}
+              />
+            )}
+
+            {result.details.security && (
+              <CheckSection
+                title="Security"
+                section="security"
+                checks={result.details.security}
+                expanded={expandedSections.has("security")}
+                onToggle={toggleSection}
+              />
+            )}
+
+            {result.details.accessibility && (
+              <CheckSection
+                title="Accessibility"
+                section="accessibility"
+                checks={result.details.accessibility}
+                expanded={expandedSections.has("accessibility")}
+                onToggle={toggleSection}
+              />
+            )}
+
+            {result.details.analytics && (
+              <CheckSection
+                title="Analytics & Tracking"
+                section="analytics"
+                checks={result.details.analytics}
+                expanded={expandedSections.has("analytics")}
+                onToggle={toggleSection}
+              />
+            )}
+
+            {result.details.caching && (
+              <CheckSection
+                title="Caching & CDN"
+                section="caching"
+                checks={result.details.caching}
+                expanded={expandedSections.has("caching")}
+                onToggle={toggleSection}
+              />
+            )}
           </div>
         </div>
       </div>

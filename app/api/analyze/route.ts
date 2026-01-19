@@ -24,9 +24,9 @@ async function analyzePagesConcurrently(
   for (let i = 0; i < pages.length; i += maxConcurrent) {
     const batch = pages.slice(i, i + maxConcurrent);
     const batchResults = await Promise.all(
-      batch.map((page) => {
+      batch.map(async (page) => {
         try {
-          return analyzePage(page.html, page.url, baseUrl);
+          return await analyzePage(page.html, page.url, baseUrl);
         } catch (error) {
           // Return a failed report if analysis fails
           return {
@@ -38,7 +38,7 @@ async function analyzePagesConcurrently(
             meta: { title: null, description: null, keywords: null, robots: null, canonical: null },
             og: { title: null, description: null, image: null },
             twitter: { card: null, title: null, description: null, image: null },
-            jsonLd: { present: false, valid: false, count: 0, errors: [], types: [] },
+            jsonLd: { present: false, valid: false, count: 0, errors: [], types: [], data: [] },
             sitemap: { present: false, url: null },
             issues: ["Failed to analyze page"],
             status: "fail" as const,

@@ -1,5 +1,10 @@
 import * as cheerio from "cheerio";
-import type { CheckResult } from "@/app/types";
+import type { CheckResult, PerformanceCheck, SecurityCheck, AccessibilityCheck, AnalyticsCheck, CachingCheck } from "@/app/types";
+import { analyzePerformance } from "@/lib/performance-analyzer";
+import { analyzeSecurity } from "@/lib/security-analyzer";
+import { analyzeAccessibility } from "@/lib/accessibility-analyzer";
+import { analyzeAnalytics } from "@/lib/analytics-analyzer";
+import { analyzeCaching } from "@/lib/caching-analyzer";
 
 export interface PageReport {
   url: string;
@@ -37,11 +42,17 @@ export interface PageReport {
     count: number;
     errors: string[];
     types: string[];
+    data: Array<{ content: string; index: number }>;
   };
   sitemap: {
     present: boolean;
     url: string | null;
   };
+  performance?: PerformanceCheck;
+  security?: SecurityCheck;
+  accessibility?: AccessibilityCheck;
+  analytics?: AnalyticsCheck;
+  caching?: CachingCheck;
   issues: string[];
   status: "pass" | "warn" | "fail";
 }
@@ -49,15 +60,16 @@ export interface PageReport {
 /**
  * Validates JSON-LD structured data
  */
-function validateJsonLd(html: string): { valid: boolean; count: number; errors: string[]; types: string[] } {
+function validateJsonLd(html: string): { valid: boolean; count: number; errors: string[]; types: string[]; data: Array<{ content: string; index: number }> } {
   const errors: string[] = [];
   const types: string[] = [];
+  const data: Array<{ content: string; index: number }> = [];
   let count = 0;
   let valid = true;
 
   // Use Cheerio to find script tags more reliably
   const $ = cheerio.load(html);
-  const jsonLdScripts: string[] = [];
+  const jsonLdScripts: Array<{ content: string; index: number }> = [];
   const processedScripts = new Set<number>(); // Track processed scripts to avoid duplicates
 
   // Find all script tags and check for JSON-LD
@@ -83,14 +95,14 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
     if (isJsonLdType || looksLikeJsonLd) {
       // Avoid duplicates by checking if we've already processed this script
       if (!processedScripts.has(index)) {
-        jsonLdScripts.push(trimmed);
+        jsonLdScripts.push({ content: trimmed, index });
         processedScripts.add(index);
       }
     }
   });
 
   if (jsonLdScripts.length === 0) {
-    return { valid: false, count: 0, errors: [], types: [] };
+    return { valid: false, count: 0, errors: [], types: [], data: [] };
   }
 
   // Helper function to extract types from JSON-LD object
@@ -121,8 +133,13 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
     }
   };
 
-  for (const jsonContent of jsonLdScripts) {
+  for (const jsonScript of jsonLdScripts) {
     count++;
+    const jsonContent = jsonScript.content;
+    
+    // Store the content for display
+    data.push({ content: jsonContent, index: count });
+    
     try {
       // Clean up the JSON content - remove any HTML comments or extra whitespace
       let cleanedContent = jsonContent.trim();
@@ -193,13 +210,18 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
   // Remove duplicate types
   const uniqueTypes = Array.from(new Set(types));
 
-  return { valid, count, errors, types: uniqueTypes };
+  return { valid, count, errors, types: uniqueTypes, data };
 }
 
 /**
  * Analyzes a single page's SEO elements
  */
-export function analyzePage(html: string, url: string, baseUrl?: URL): PageReport {
+export async function analyzePage(
+  html: string, 
+  url: string, 
+  baseUrl?: URL,
+  headers?: Record<string, string | string[] | undefined>
+): Promise<PageReport> {
   const $ = cheerio.load(html);
   const issues: string[] = [];
 
@@ -255,23 +277,11 @@ export function analyzePage(html: string, url: string, baseUrl?: URL): PageRepor
   const ogImage = $('meta[property="og:image"]').attr("content") || null;
 
   // Analyze Twitter Card tags
+  // Note: Missing Twitter cards are warnings only, not failures
   const twitterCard = $('meta[name="twitter:card"]').attr("content") || null;
   const twitterTitle = $('meta[name="twitter:title"]').attr("content") || null;
   const twitterDescription = $('meta[name="twitter:description"]').attr("content") || null;
   const twitterImage = $('meta[name="twitter:image"]').attr("content") || null;
-
-  if (!twitterCard) {
-    issues.push("Missing twitter:card");
-  }
-  if (!twitterTitle) {
-    issues.push("Missing twitter:title");
-  }
-  if (!twitterDescription) {
-    issues.push("Missing twitter:description");
-  }
-  if (!twitterImage) {
-    issues.push("Missing twitter:image");
-  }
 
   // Analyze JSON-LD
   const jsonLdResult = validateJsonLd(html);
@@ -308,13 +318,48 @@ export function analyzePage(html: string, url: string, baseUrl?: URL): PageRepor
   }
 
   // Determine status based on issue count
+  // Note: Twitter card issues don't count toward failures (they're warnings only)
+  const criticalIssues = issues.filter(issue => 
+    !issue.includes("twitter:") && 
+    !issue.includes("Missing twitter")
+  );
+  
   let status: "pass" | "warn" | "fail";
-  if (issues.length === 0) {
+  if (criticalIssues.length === 0) {
     status = "pass";
-  } else if (issues.length <= 2) {
+  } else if (criticalIssues.length <= 2) {
     status = "warn";
   } else {
     status = "fail";
+  }
+
+  // Perform additional checks if headers are available
+  const passed: string[] = [];
+  const warnings: string[] = [];
+  const failed: string[] = [];
+
+  let performance: PerformanceCheck | undefined;
+  let security: SecurityCheck | undefined;
+  let accessibility: AccessibilityCheck | undefined;
+  let analytics: AnalyticsCheck | undefined;
+  let caching: CachingCheck | undefined;
+
+  try {
+    // Always run accessibility (doesn't need headers)
+    accessibility = analyzeAccessibility(html, passed, warnings, failed);
+    
+    // Always run analytics (doesn't need headers)
+    analytics = analyzeAnalytics(html, passed, warnings, failed);
+
+    // Run performance, security, and caching if headers are available
+    if (headers) {
+      performance = await analyzePerformance(url, html, passed, warnings, failed);
+      security = await analyzeSecurity(url, html, headers, passed, warnings, failed);
+      caching = await analyzeCaching(url, headers, passed, warnings, failed);
+    }
+  } catch (error) {
+    // If additional checks fail, continue without them
+    console.warn("Additional checks failed:", error);
   }
 
   return {
@@ -347,11 +392,17 @@ export function analyzePage(html: string, url: string, baseUrl?: URL): PageRepor
       count: jsonLdResult.count,
       errors: jsonLdResult.errors,
       types: jsonLdResult.types,
+      data: jsonLdResult.data,
     },
     sitemap: {
       present: sitemapPresent,
       url: sitemapUrl,
     },
+    performance,
+    security,
+    accessibility,
+    analytics,
+    caching,
     issues,
     status,
   };

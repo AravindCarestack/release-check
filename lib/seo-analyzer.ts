@@ -8,9 +8,19 @@ import type {
   RobotsCheck,
   LinksCheck,
   TechnicalCheck,
+  PerformanceCheck,
+  SecurityCheck,
+  AccessibilityCheck,
+  AnalyticsCheck,
+  CachingCheck,
   CheckResult,
   BrokenLink,
 } from "@/app/types";
+import { analyzePerformance } from "@/lib/performance-analyzer";
+import { analyzeSecurity } from "@/lib/security-analyzer";
+import { analyzeAccessibility } from "@/lib/accessibility-analyzer";
+import { analyzeAnalytics } from "@/lib/analytics-analyzer";
+import { analyzeCaching } from "@/lib/caching-analyzer";
 
 const TIMEOUT = 30000; // 30 seconds
 const MAX_REDIRECTS = 5;
@@ -28,7 +38,7 @@ export async function analyzeWebsite(url: string): Promise<SEOAnalysisResult> {
 
   try {
     // Fetch HTML
-    const { html, finalUrl, statusCode, isHttps, httpRedirects } = await fetchHtml(normalizedUrl);
+    const { html, finalUrl, statusCode, isHttps, httpRedirects, headers } = await fetchHtml(normalizedUrl);
     const $ = cheerio.load(html);
     const baseUrl = new URL(finalUrl);
 
@@ -54,6 +64,21 @@ export async function analyzeWebsite(url: string): Promise<SEOAnalysisResult> {
       statusCode,
     }, passed, warnings, failed);
 
+    // Analyze performance
+    const performance = await analyzePerformance(finalUrl, html, passed, warnings, failed);
+
+    // Analyze security
+    const security = await analyzeSecurity(finalUrl, html, headers, passed, warnings, failed);
+
+    // Analyze accessibility
+    const accessibility = analyzeAccessibility(html, passed, warnings, failed);
+
+    // Analyze analytics
+    const analytics = analyzeAnalytics(html, passed, warnings, failed);
+
+    // Analyze caching
+    const caching = await analyzeCaching(finalUrl, headers, passed, warnings, failed);
+
     // Calculate score
     const score = calculateScore(passed, warnings, failed);
 
@@ -69,6 +94,11 @@ export async function analyzeWebsite(url: string): Promise<SEOAnalysisResult> {
         robots,
         links,
         technical,
+        performance,
+        security,
+        accessibility,
+        analytics,
+        caching,
       },
     };
   } catch (error: any) {
@@ -82,6 +112,7 @@ async function fetchHtml(url: string): Promise<{
   statusCode: number;
   isHttps: boolean;
   httpRedirects: boolean;
+  headers: Record<string, string | string[] | undefined>;
 }> {
   let currentUrl = url;
   let redirectCount = 0;
@@ -125,6 +156,7 @@ async function fetchHtml(url: string): Promise<{
           statusCode: response.status,
           isHttps: currentUrl.startsWith("https://"),
           httpRedirects,
+          headers: response.headers as Record<string, string | string[] | undefined>,
         };
       }
 
