@@ -204,7 +204,7 @@ export async function exportSinglePageToPDF(result: SEOAnalysisResult, url: stri
   yPos += 5;
   
   // Score
-  const scoreColor = result.score >= 80 ? [0, 128, 0] : result.score >= 60 ? [255, 165, 0] : [255, 0, 0];
+  const scoreColor: [number, number, number] = result.score >= 80 ? [0, 128, 0] : result.score >= 60 ? [255, 165, 0] : [255, 0, 0];
   addText(`Overall SEO Score: ${result.score}/100`, 16, true, scoreColor);
   yPos += 10;
   
@@ -216,28 +216,29 @@ export async function exportSinglePageToPDF(result: SEOAnalysisResult, url: stri
   yPos += 10;
   
   // Detailed checks
-  const sections = [
-    { title: "Meta Tags", checks: result.details.metaTags },
-    { title: "Open Graph", checks: result.details.openGraph },
-    { title: "Twitter Cards", checks: result.details.twitter },
-    { title: "Robots & Indexing", checks: result.details.robots },
-    { title: "Technical SEO", checks: result.details.technical },
+  type CheckSection = { title: string; checks: Record<string, { status: string; message: string; value?: string | number | boolean; recommendation?: string }> };
+  const sections: CheckSection[] = [
+    { title: "Meta Tags", checks: result.details.metaTags as any },
+    { title: "Open Graph", checks: result.details.openGraph as any },
+    { title: "Twitter Cards", checks: result.details.twitter as any },
+    { title: "Robots & Indexing", checks: result.details.robots as any },
+    { title: "Technical SEO", checks: result.details.technical as any },
   ];
   
   if (result.details.performance) {
-    sections.push({ title: "Performance", checks: result.details.performance });
+    sections.push({ title: "Performance", checks: result.details.performance as any });
   }
   if (result.details.security) {
-    sections.push({ title: "Security", checks: result.details.security });
+    sections.push({ title: "Security", checks: result.details.security as any });
   }
   if (result.details.accessibility) {
-    sections.push({ title: "Accessibility", checks: result.details.accessibility });
+    sections.push({ title: "Accessibility", checks: result.details.accessibility as any });
   }
   if (result.details.analytics) {
-    sections.push({ title: "Analytics", checks: result.details.analytics });
+    sections.push({ title: "Analytics", checks: result.details.analytics as any });
   }
   if (result.details.caching) {
-    sections.push({ title: "Caching", checks: result.details.caching });
+    sections.push({ title: "Caching", checks: result.details.caching as any });
   }
   
   sections.forEach(section => {
@@ -248,7 +249,7 @@ export async function exportSinglePageToPDF(result: SEOAnalysisResult, url: stri
     
     addText(section.title, 12, true);
     Object.entries(section.checks).forEach(([key, check]) => {
-      const statusColor = check.status === "pass" ? [0, 128, 0] : check.status === "warn" ? [255, 165, 0] : [255, 0, 0];
+      const statusColor: [number, number, number] = check.status === "pass" ? [0, 128, 0] : check.status === "warn" ? [255, 165, 0] : [255, 0, 0];
       addText(`  ${key}: ${check.message}`, 9, false, statusColor);
       if (check.recommendation) {
         addText(`    Recommendation: ${check.recommendation}`, 8, false, [128, 128, 128]);
@@ -349,7 +350,7 @@ export async function exportCrawlResultsToPDF(pages: PageReport[]): Promise<void
       yPos = 20;
     }
     
-    const statusColor = page.status === "pass" ? [0, 128, 0] : page.status === "warn" ? [255, 165, 0] : [255, 0, 0];
+    const statusColor: [number, number, number] = page.status === "pass" ? [0, 128, 0] : page.status === "warn" ? [255, 165, 0] : [255, 0, 0];
     addText(`Page ${index + 1}: ${page.url}`, 11, true, statusColor);
     addText(`  Status: ${page.status.toUpperCase()}`, 9, false, statusColor);
     addText(`  H1 Count: ${page.h1Count}`, 9);
