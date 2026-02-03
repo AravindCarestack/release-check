@@ -193,10 +193,12 @@ export async function parseSitemap(sitemapUrl: string, debug: boolean = false): 
 }
 
 /**
- * Discovers sitemap URLs from common locations
- * WHY: Sitemaps can be at different paths, we check multiple common locations
+ * Discovers sitemap URLs by directly checking common sitemap.xml locations
+ * WHY: Directly fetching sitemap.xml is faster and more reliable than checking robots.txt first
  */
 export async function discoverSitemap(baseUrl: URL, debug: boolean = false): Promise<string | null> {
+  // Common sitemap paths, ordered by likelihood
+  // Start with /sitemap.xml as it's the most common location
   const commonPaths = [
     "/sitemap.xml",
     "/sitemap_index.xml",
@@ -206,130 +208,14 @@ export async function discoverSitemap(baseUrl: URL, debug: boolean = false): Pro
     "/sitemaps.xml",
   ];
 
-  // First, check robots.txt for sitemap reference
-  // WHY: robots.txt often contains the canonical sitemap location
-  if (debug) console.log(`[SitemapDiscovery] Checking robots.txt for ${baseUrl.hostname}`);
-  try {
-    const robotsUrl = new URL("/robots.txt", baseUrl).href;
-    if (debug) console.log(`[SitemapDiscovery] Fetching robots.txt: ${robotsUrl}`);
-    const robotsResponse = await axios.get(robotsUrl, {
-      timeout: 8000,
-      validateStatus: () => true,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; SEOValidator/1.0)",
-      },
-      maxRedirects: 3,
-    });
-
-    if (robotsResponse.status === 200) {
-      const robotsText = typeof robotsResponse.data === "string" 
-        ? robotsResponse.data 
-        : robotsResponse.data.toString();
-      
-      // Match multiple sitemap declarations (some sites have multiple)
-      // WHY: robots.txt can contain multiple Sitemap: lines
-      const sitemapMatches = Array.from(robotsText.matchAll(/Sitemap:\s*(.+)/gi));
-      
-      // Try each sitemap URL found in robots.txt
-      for (const match of sitemapMatches) {
-        const sitemapUrl = (match as RegExpMatchArray)[1].trim();
-        // Remove comments and whitespace
-        const cleanUrl = sitemapUrl.split("#")[0].trim();
-        if (!cleanUrl) continue;
-        
-        // Normalize URL (handle relative URLs in robots.txt)
-        // Also handle www vs non-www - if sitemap URL has different www than base, try both
-        try {
-          let absoluteSitemapUrl = new URL(cleanUrl, baseUrl).href;
-          
-          // If sitemap URL has different www prefix than base URL, try both
-          const sitemapUrlObj = new URL(cleanUrl);
-          const baseHostnameNoWww = baseUrl.hostname.replace(/^www\./, "");
-          const sitemapHostnameNoWww = sitemapUrlObj.hostname.replace(/^www\./, "");
-          
-          // If they're the same domain but different www, try the base URL's www preference
-          if (baseHostnameNoWww === sitemapHostnameNoWww && 
-              baseUrl.hostname.startsWith("www.") !== sitemapUrlObj.hostname.startsWith("www.")) {
-            // Try with base URL's www preference
-            const preferredHostname = baseUrl.hostname.startsWith("www.") 
-              ? `www.${sitemapHostnameNoWww}` 
-              : sitemapHostnameNoWww;
-            absoluteSitemapUrl = new URL(sitemapUrlObj.pathname + sitemapUrlObj.search, 
-              `${sitemapUrlObj.protocol}//${preferredHostname}`).href;
-            if (debug) {
-              console.log(`[SitemapDiscovery] Normalized sitemap URL www: ${cleanUrl} -> ${absoluteSitemapUrl}`);
-            }
-          } else {
-            absoluteSitemapUrl = new URL(cleanUrl, baseUrl).href;
-          }
-          
-          // Verify it exists (try both HEAD and GET with retries)
-          // Also try the opposite www version if different
-          const urlsToTry = [absoluteSitemapUrl];
-          if (baseHostnameNoWww === sitemapHostnameNoWww && 
-              baseUrl.hostname.startsWith("www.") !== sitemapUrlObj.hostname.startsWith("www.")) {
-            // Try the opposite www version too
-            const oppositeHostname = baseUrl.hostname.startsWith("www.") 
-              ? sitemapHostnameNoWww 
-              : `www.${sitemapHostnameNoWww}`;
-            const oppositeUrl = new URL(sitemapUrlObj.pathname + sitemapUrlObj.search, 
-              `${sitemapUrlObj.protocol}//${oppositeHostname}`).href;
-            urlsToTry.push(oppositeUrl);
-            if (debug) {
-              console.log(`[SitemapDiscovery] Will try both www versions: ${absoluteSitemapUrl} and ${oppositeUrl}`);
-            }
-          }
-          
-          for (const urlToTry of urlsToTry) {
-            for (const method of ["head", "get"] as const) {
-              try {
-                const testResponse = method === "head"
-                  ? await axios.head(urlToTry, {
-                      timeout: 8000,
-                      validateStatus: () => true,
-                      maxRedirects: 3,
-                    })
-                  : await axios.get(urlToTry, {
-                      timeout: 8000,
-                      validateStatus: (status) => status === 200,
-                      maxRedirects: 3,
-                      headers: {
-                        "User-Agent": "Mozilla/5.0 (compatible; SEOValidator/1.0)",
-                        "Accept": "application/xml, text/xml, */*",
-                      },
-                    });
-                
-                if (testResponse.status === 200) {
-                  if (debug) console.log(`[SitemapDiscovery] ✓ Found sitemap in robots.txt: ${urlToTry}`);
-                  return urlToTry;
-                }
-              } catch (error: any) {
-                // If HEAD fails, try GET; if GET fails, continue to next URL or sitemap
-                if (method === "get" && urlToTry === urlsToTry[urlsToTry.length - 1]) {
-                  continue; // Last URL, last method - continue to next sitemap
-                }
-              }
-            }
-          }
-        } catch {
-          // Invalid URL, continue to next match
-          continue;
-        }
-      }
-    }
-  } catch (error: any) {
-    // Continue to check common paths even if robots.txt fails
-    // Don't log error as this is expected for many sites
-  }
-
   // Check common sitemap locations concurrently for faster discovery
-  // WHY: Many sites use standard paths even if not in robots.txt
-  if (debug) console.log(`[SitemapDiscovery] Checking common sitemap paths: ${commonPaths.join(", ")}`);
+  // WHY: Directly checking sitemap.xml is faster than parsing robots.txt first
+  if (debug) console.log(`[SitemapDiscovery] Directly checking common sitemap paths: ${commonPaths.join(", ")}`);
   const checkPromises = commonPaths.map(async (path) => {
     try {
       const sitemapUrl = new URL(path, baseUrl).href;
       
-      // Try HEAD first, then GET if HEAD fails
+      // Try HEAD first (faster), then GET if HEAD fails
       for (const method of ["head", "get"] as const) {
         try {
           const response = method === "head"
@@ -337,6 +223,9 @@ export async function discoverSitemap(baseUrl: URL, debug: boolean = false): Pro
                 timeout: 8000,
                 validateStatus: () => true,
                 maxRedirects: 3,
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (compatible; SEOValidator/1.0)",
+                },
               })
             : await axios.get(sitemapUrl, {
                 timeout: 8000,
@@ -349,7 +238,7 @@ export async function discoverSitemap(baseUrl: URL, debug: boolean = false): Pro
               });
           
           if (response.status === 200) {
-            if (debug) console.log(`[SitemapDiscovery] ✓ Found sitemap at common path: ${sitemapUrl}`);
+            if (debug) console.log(`[SitemapDiscovery] ✓ Found sitemap at: ${sitemapUrl}`);
             return sitemapUrl;
           }
         } catch {
@@ -370,6 +259,77 @@ export async function discoverSitemap(baseUrl: URL, debug: boolean = false): Pro
     if (result.status === "fulfilled" && result.value) {
       return result.value;
     }
+  }
+
+  // Fallback: Check robots.txt only if direct paths failed
+  // WHY: Some sites may only declare sitemap in robots.txt
+  if (debug) console.log(`[SitemapDiscovery] No sitemap found at common paths, checking robots.txt as fallback`);
+  try {
+    const robotsUrl = new URL("/robots.txt", baseUrl).href;
+    const robotsResponse = await axios.get(robotsUrl, {
+      timeout: 8000,
+      validateStatus: () => true,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; SEOValidator/1.0)",
+      },
+      maxRedirects: 3,
+    });
+
+    if (robotsResponse.status === 200) {
+      const robotsText = typeof robotsResponse.data === "string" 
+        ? robotsResponse.data 
+        : robotsResponse.data.toString();
+      
+      // Match sitemap declarations
+      const sitemapMatches = Array.from(robotsText.matchAll(/Sitemap:\s*(.+)/gi));
+      
+      // Try each sitemap URL found in robots.txt
+      for (const match of sitemapMatches) {
+        const sitemapUrl = (match as RegExpMatchArray)[1].trim();
+        const cleanUrl = sitemapUrl.split("#")[0].trim();
+        if (!cleanUrl) continue;
+        
+        try {
+          const absoluteSitemapUrl = new URL(cleanUrl, baseUrl).href;
+          
+          // Verify it exists
+          for (const method of ["head", "get"] as const) {
+            try {
+              const testResponse = method === "head"
+                ? await axios.head(absoluteSitemapUrl, {
+                    timeout: 8000,
+                    validateStatus: () => true,
+                    maxRedirects: 3,
+                  })
+                : await axios.get(absoluteSitemapUrl, {
+                    timeout: 8000,
+                    validateStatus: (status) => status === 200,
+                    maxRedirects: 3,
+                    headers: {
+                      "User-Agent": "Mozilla/5.0 (compatible; SEOValidator/1.0)",
+                      "Accept": "application/xml, text/xml, */*",
+                    },
+                  });
+              
+              if (testResponse.status === 200) {
+                if (debug) console.log(`[SitemapDiscovery] ✓ Found sitemap in robots.txt: ${absoluteSitemapUrl}`);
+                return absoluteSitemapUrl;
+              }
+            } catch {
+              if (method === "get") {
+                break; // Try next sitemap from robots.txt
+              }
+            }
+          }
+        } catch {
+          // Invalid URL, continue to next match
+          continue;
+        }
+      }
+    }
+  } catch (error: any) {
+    // robots.txt check failed, continue
+    if (debug) console.log(`[SitemapDiscovery] robots.txt check failed or not found`);
   }
 
   if (debug) console.log(`[SitemapDiscovery] ✗ No sitemap found for ${baseUrl.hostname}`);

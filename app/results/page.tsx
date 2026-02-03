@@ -8,6 +8,7 @@ import ResultsDisplay from "@/components/ResultsDisplay";
 import PageGrid from "@/components/PageGrid";
 import Terminal from "@/components/Terminal";
 import { groupPagesByLocale, sortLocaleGroups } from "@/lib/locale-detector";
+import { exportCrawlResultsToCSV, exportCrawlResultsToPDF, downloadCSV } from "@/lib/export-utils";
 
 interface CrawlResult {
   totalPages: number;
@@ -31,6 +32,8 @@ function ResultsContent() {
   const [error, setError] = useState<string | null>(null);
   const [terminalLogs, setTerminalLogs] = useState<Array<{ timestamp: string; level: "info" | "success" | "warning" | "error"; message: string }>>([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [exportingCSV, setExportingCSV] = useState(false);
 
   // Detect locales from crawled pages
   const localeInfo = useMemo(() => {
@@ -134,6 +137,34 @@ function ResultsContent() {
 
     fetchAnalysis();
   }, [searchParams]);
+
+  const handleExportPDF = async () => {
+    if (!crawlResult?.pages) return;
+    setExportingPDF(true);
+    try {
+      await exportCrawlResultsToPDF(crawlResult.pages);
+    } catch (error) {
+      console.error("Failed to export PDF:", error);
+      alert("Failed to export PDF. Please try again.");
+    } finally {
+      setExportingPDF(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!crawlResult?.pages) return;
+    setExportingCSV(true);
+    try {
+      const csv = exportCrawlResultsToCSV(crawlResult.pages);
+      const filename = `seo-crawl-report-${Date.now()}.csv`;
+      downloadCSV(csv, filename);
+    } catch (error) {
+      console.error("Failed to export CSV:", error);
+      alert("Failed to export CSV. Please try again.");
+    } finally {
+      setExportingCSV(false);
+    }
+  };
 
   if (loading) {
     const crawl = searchParams.get("crawl") === "true";
@@ -260,9 +291,57 @@ function ResultsContent() {
                 </svg>
                 Back to Home
               </button>
-              <h1 className="text-2xl font-semibold text-gray-900 mb-2">
-                SEO Analysis Results
-              </h1>
+              <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  SEO Analysis Results
+                </h1>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportPDF}
+                    disabled={exportingPDF}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {exportingPDF ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Exporting...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        Export PDF
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleExportCSV}
+                    disabled={exportingCSV}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {exportingCSV ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Exporting...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Export CSV
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
               <div className="space-y-2">
                 <p className="text-sm text-gray-600">
                   Analyzed {crawlResult.totalPages} page{crawlResult.totalPages !== 1 ? "s" : ""} from the website
@@ -337,7 +416,8 @@ function ResultsContent() {
 
   // Single page results
   if (singleResult) {
-    return <ResultsDisplay result={singleResult} />;
+    const url = searchParams.get("url") || "unknown";
+    return <ResultsDisplay result={singleResult} url={url} />;
   }
 
   return null;
