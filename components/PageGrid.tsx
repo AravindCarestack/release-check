@@ -9,7 +9,28 @@ interface PageGridProps {
   pages: PageReport[];
 }
 
-type FilterType = "all" | "failed" | "missingH1" | "missingDescription";
+type FilterType = "all" | "failed" | "missingH1" | "missingDescription" | "canonicalWarning";
+
+function hasCanonicalWarning(page: PageReport): boolean {
+  const canonical = page?.meta?.canonical;
+  if (!canonical) return true;
+
+  try {
+    const canonicalUrl = new URL(canonical);
+    const pageUrl = new URL(page.url);
+
+    const normalizeHost = (host: string) => host.replace(/^www\./, "").toLowerCase();
+    const normalizePath = (path: string) =>
+      (path.endsWith("/") ? path.slice(0, -1) : path) || "/";
+
+    return !(
+      normalizeHost(canonicalUrl.hostname) === normalizeHost(pageUrl.hostname) &&
+      normalizePath(canonicalUrl.pathname) === normalizePath(pageUrl.pathname)
+    );
+  } catch {
+    return true;
+  }
+}
 
 export default function PageGrid({ pages }: PageGridProps) {
   const [filter, setFilter] = useState<FilterType>("all");
@@ -30,6 +51,8 @@ export default function PageGrid({ pages }: PageGridProps) {
         return pages.filter((p) => !p.hasSingleH1);
       case "missingDescription":
         return pages.filter((p) => !p.meta.description);
+      case "canonicalWarning":
+        return pages.filter((p) => hasCanonicalWarning(p));
       default:
         return pages;
     }
@@ -160,6 +183,16 @@ export default function PageGrid({ pages }: PageGridProps) {
             }`}
           >
             Missing Description
+          </button>
+          <button
+            onClick={() => setFilter("canonicalWarning")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+              filter === "canonicalWarning"
+                ? "bg-blue-600 text-white"
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Canonical Warning
           </button>
         </div>
 

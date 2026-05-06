@@ -13,12 +13,37 @@ export default function PageCard({ page }: PageCardProps) {
   const [jsonLdTypesExpanded, setJsonLdTypesExpanded] = useState(false);
   const [twitterExpanded, setTwitterExpanded] = useState(false);
   const [openGraphExpanded, setOpenGraphExpanded] = useState(false);
-  const CheckItem = ({ label, hasValue }: { label: string; hasValue: boolean }) => (
-    <div className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-      <span className="text-sm text-gray-700">{label}</span>
-      <span className={`text-base font-medium ${hasValue ? "text-green-600" : "text-red-600"}`}>
+  const checkForCanonical = (canonical: string, value: string) => {
+    try {
+      const c = new URL(canonical);
+      const v = new URL(value);
+  
+      const normalizeHost = (host: string) => host.replace(/^www\./, "").toLowerCase();
+      const normalizePath = (path: string) => (path.endsWith("/") ? path.slice(0, -1) : path) || "/";
+  
+      return (
+        normalizeHost(c.hostname) === normalizeHost(v.hostname) &&
+        normalizePath(c.pathname) === normalizePath(v.pathname)
+      );
+    } catch {
+      return false;
+    }
+  };
+  const CheckItem = ({ label, hasValue, value, isWarning = false }: { label: string; hasValue: boolean; value?: string|null; isWarning?: boolean }) => (
+    <div className="flex flex-col text-left items-baseline justify-between py-2 border-b border-gray-100 last:border-0">
+   <div className="flex items-center gap-2 justify-between">
+   <span className="text-sm text-gray-700">{label}</span>
+      {isWarning ? <span className={`text-lg font-medium text-yellow-600`}>
+        ⚠
+      </span> : <span className={`text-base font-medium ${hasValue ? "text-green-600" : "text-red-600"}`}>
         {hasValue ? "✓" : "✗"}
-      </span>
+      </span>}
+   </div>
+      {value && (
+        <span className={`text-sm text-gray-700 ${hasValue ? "text-green-600" : "text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200 break-words"}`}>
+          {value}
+        </span>
+      )}
     </div>
   );
 
@@ -114,7 +139,11 @@ export default function PageCard({ page }: PageCardProps) {
             </div>
           )}
           <CheckItem label="Robots" hasValue={!!page.meta.robots && !page.meta.robots.toLowerCase().includes("noindex")} />
-          <CheckItem label="Canonical" hasValue={!!page.meta.canonical} />
+          <CheckItem label="Canonical"
+           hasValue={checkForCanonical(page?.meta?.canonical || "",page.url)}
+            value={page?.meta?.canonical}
+            isWarning={!checkForCanonical(page?.meta?.canonical || "",page.url)}
+            />
         </div>
       </div>
 

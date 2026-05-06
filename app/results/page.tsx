@@ -7,7 +7,7 @@ import type { PageReport } from "@/lib/page-analyzer";
 import ResultsDisplay from "@/components/ResultsDisplay";
 import PageGrid from "@/components/PageGrid";
 import Terminal from "@/components/Terminal";
-import { groupPagesByLocale, sortLocaleGroups } from "@/lib/locale-detector";
+import { groupPagesByLocale, sortLocaleGroups, detectLocale } from "@/lib/locale-detector";
 import { exportCrawlResultsToCSV, exportCrawlResultsToPDF, downloadCSV } from "@/lib/export-utils";
 
 interface CrawlResult {
@@ -34,6 +34,8 @@ function ResultsContent() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
   const [exportingCSV, setExportingCSV] = useState(false);
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [pdfExportLocale, setPdfExportLocale] = useState<string>("all");
 
   // Detect locales from crawled pages
   const localeInfo = useMemo(() => {
@@ -138,11 +140,28 @@ function ResultsContent() {
     fetchAnalysis();
   }, [searchParams]);
 
+  // Pages to export based on selected locale
+  const pagesForPdfExport = useMemo(() => {
+    if (!crawlResult?.pages) return [];
+    if (pdfExportLocale === "all") return crawlResult.pages;
+    return crawlResult.pages.filter((page) => detectLocale(page.url).locale === pdfExportLocale);
+  }, [crawlResult?.pages, pdfExportLocale]);
+
   const handleExportPDF = async () => {
-    if (!crawlResult?.pages) return;
+    if (!pagesForPdfExport.length) return;
     setExportingPDF(true);
     try {
-      await exportCrawlResultsToPDF(crawlResult.pages);
+      const localeLabel =
+        pdfExportLocale === "all"
+          ? "All Countries"
+          : localeInfo?.groups.find((g) => g.locale.locale === pdfExportLocale)?.locale.displayName ?? "Selected Region";
+      await exportCrawlResultsToPDF({
+        pages: pagesForPdfExport,
+        locale: pdfExportLocale,
+        localeLabel,
+        totalPagesInCrawl: crawlResult?.totalPages ?? pagesForPdfExport.length,
+      });
+      setShowPDFModal(false);
     } catch (error) {
       console.error("Failed to export PDF:", error);
       alert("Failed to export PDF. Please try again.");
@@ -297,26 +316,14 @@ function ResultsContent() {
                 </h1>
                 <div className="flex gap-2">
                   <button
-                    onClick={handleExportPDF}
+                    onClick={() => setShowPDFModal(true)}
                     disabled={exportingPDF}
                     className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {exportingPDF ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Exporting...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                        </svg>
-                        Export PDF
-                      </>
-                    )}
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    Export PDF
                   </button>
                   <button
                     onClick={handleExportCSV}
@@ -380,6 +387,66 @@ function ResultsContent() {
                 )}
               </div>
             </div>
+
+            {/* Export PDF Modal */}
+            {showPDFModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+                <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Export PDF Report</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Choose which region to include in the report. The PDF will use a professional layout with clear sections and alignment.
+                  </p>
+                  <div className="mb-4">
+                    <label htmlFor="pdf-region" className="block text-sm font-medium text-gray-700 mb-2">
+                      Region / Country
+                    </label>
+                    <select
+                      id="pdf-region"
+                      value={pdfExportLocale}
+                      onChange={(e) => setPdfExportLocale(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    >
+                      <option value="all">
+                        All Countries ({crawlResult?.pages?.length ?? 0} pages)
+                      </option>
+                      {localeInfo?.groups.map((group) => (
+                        <option key={group.locale.locale} value={group.locale.locale}>
+                          {group.locale.displayName} ({group.pages.length} pages)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowPDFModal(false)}
+                      disabled={exportingPDF}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExportPDF}
+                      disabled={exportingPDF || pagesForPdfExport.length === 0}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {exportingPDF ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Exporting...
+                        </>
+                      ) : (
+                        "Export PDF"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Robots.txt Display */}
             {crawlResult.robotsTxt && (
