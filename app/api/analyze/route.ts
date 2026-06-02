@@ -40,6 +40,7 @@ async function analyzePagesConcurrently(
             twitter: { card: null, title: null, description: null, image: null },
             jsonLd: { present: false, valid: false, count: 0, errors: [], types: [], data: [] },
             sitemap: { present: false, url: null },
+            alternates: [],
             issues: ["Failed to analyze page"],
             status: "fail" as const,
           };

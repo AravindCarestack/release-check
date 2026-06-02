@@ -1,15 +1,27 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import PageCard from "./PageCard";
 import type { PageReport } from "@/lib/page-analyzer";
 import { groupPagesByLocale, sortLocaleGroups, detectLocale } from "@/lib/locale-detector";
+import {
+  hasAlternateIssue,
+  type AlternateValidationResult,
+} from "@/lib/alternate-validator";
 
 interface PageGridProps {
   pages: PageReport[];
+  sitemapUrl?: string | null;
+  siteUrl?: string | null;
 }
 
-type FilterType = "all" | "failed" | "missingH1" | "missingDescription" | "canonicalWarning";
+type FilterType =
+  | "all"
+  | "failed"
+  | "missingH1"
+  | "missingDescription"
+  | "canonicalWarning"
+  | "alternateIssue";
 
 function hasCanonicalWarning(page: PageReport): boolean {
   const canonical = page?.meta?.canonical;
@@ -32,9 +44,59 @@ function hasCanonicalWarning(page: PageReport): boolean {
   }
 }
 
-export default function PageGrid({ pages }: PageGridProps) {
+export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) {
   const [filter, setFilter] = useState<FilterType>("all");
   const [selectedLocale, setSelectedLocale] = useState<string>("all");
+  const [alternateValidations, setAlternateValidations] = useState<
+    Map<string, AlternateValidationResult>
+  >(new Map());
+  const [validatingAlternates, setValidatingAlternates] = useState(false);
+  const [alternateValidationError, setAlternateValidationError] = useState<string | null>(null);
+  const [alternateValidationSummary, setAlternateValidationSummary] = useState<{
+    passed: number;
+    warned: number;
+    failed: number;
+    skipped: number;
+  } | null>(null);
+
+  const runAlternateValidation = useCallback(async () => {
+    setValidatingAlternates(true);
+    setAlternateValidationError(null);
+    setAlternateValidationSummary(null);
+
+    try {
+      const response = await fetch("/api/analyze/validate-alternates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sitemapUrl: sitemapUrl ?? undefined,
+          siteUrl: siteUrl ?? pages[0]?.url,
+          pages: pages.map((p) => ({
+            url: p.url,
+            alternates: p.alternates ?? [],
+          })),
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Alternate validation failed");
+      }
+
+      const map = new Map<string, AlternateValidationResult>(
+        Object.entries(data.results as Record<string, AlternateValidationResult>)
+      );
+      setAlternateValidations(map);
+      setAlternateValidationSummary(data.summary);
+      setFilter("alternateIssue");
+    } catch (err: unknown) {
+      setAlternateValidationError(
+        err instanceof Error ? err.message : "Alternate validation failed"
+      );
+    } finally {
+      setValidatingAlternates(false);
+    }
+  }, [pages, sitemapUrl, siteUrl]);
 
   // Get all available locales
   const availableLocales = useMemo(() => {
@@ -53,10 +115,12 @@ export default function PageGrid({ pages }: PageGridProps) {
         return pages.filter((p) => !p.meta.description);
       case "canonicalWarning":
         return pages.filter((p) => hasCanonicalWarning(p));
+      case "alternateIssue":
+        return pages.filter((p) => hasAlternateIssue(alternateValidations.get(p.url)));
       default:
         return pages;
     }
-  }, [pages, filter]);
+  }, [pages, filter, alternateValidations]);
 
   // Filter pages by locale
   const filteredPages = useMemo(() => {
@@ -194,7 +258,45 @@ export default function PageGrid({ pages }: PageGridProps) {
           >
             Canonical Warning
           </button>
+          <button
+            type="button"
+            onClick={runAlternateValidation}
+            disabled={validatingAlternates || pages.length === 0}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              filter === "alternateIssue"
+                ? "bg-blue-600 text-white"
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            {validatingAlternates ? "Validating…" : "Validate Alternate"}
+          </button>
+          {alternateValidations.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilter("alternateIssue")}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                filter === "alternateIssue"
+                  ? "bg-blue-600 text-white"
+                  : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Alternate Issues
+            </button>
+          )}
         </div>
+
+        {alternateValidationError && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            {alternateValidationError}
+          </p>
+        )}
+        {alternateValidationSummary && (
+          <p className="text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+            Alternate validation: {alternateValidationSummary.passed} passed,{" "}
+            {alternateValidationSummary.warned} warnings, {alternateValidationSummary.failed}{" "}
+            failed, {alternateValidationSummary.skipped} not in sitemap
+          </p>
+        )}
 
         {/* Results count */}
         <div className="text-sm text-gray-600 font-medium">
@@ -206,7 +308,8 @@ export default function PageGrid({ pages }: PageGridProps) {
           )}
           {filter !== "all" && (
             <span className="ml-2 text-gray-500">
-              (Status: {filter})
+              (Status:{" "}
+              {filter === "alternateIssue" ? "Alternate issues" : filter})
             </span>
           )}
         </div>
@@ -264,7 +367,11 @@ export default function PageGrid({ pages }: PageGridProps) {
               {/* Pages Grid for this locale */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {group.pages.map((page, index) => (
-                  <PageCard key={`${page.url}-${index}`} page={page} />
+                  <PageCard
+                    key={`${page.url}-${index}`}
+                    page={page}
+                    alternateValidation={alternateValidations.get(page.url)}
+                  />
                 ))}
               </div>
             </div>
@@ -274,7 +381,11 @@ export default function PageGrid({ pages }: PageGridProps) {
         // Show filtered pages in a single grid (when a specific locale is selected or no multiple locales)
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPages.map((page, index) => (
-            <PageCard key={`${page.url}-${index}`} page={page} />
+            <PageCard
+              key={`${page.url}-${index}`}
+              page={page}
+              alternateValidation={alternateValidations.get(page.url)}
+            />
           ))}
         </div>
       )}

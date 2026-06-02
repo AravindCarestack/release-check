@@ -16,6 +16,9 @@ interface CrawlResult {
     present: boolean;
     url: string | null;
   };
+  crawlStatistics?: {
+    sitemapUrl?: string | null;
+  };
   robotsTxt?: {
     present: boolean;
     content: string | null;
@@ -474,7 +477,14 @@ function ResultsContent() {
             )}
 
             {/* Page Grid */}
-            <PageGrid pages={crawlResult.pages} />
+            <PageGrid
+              pages={crawlResult.pages}
+              sitemapUrl={
+                crawlResult.crawlStatistics?.sitemapUrl ??
+                crawlResult.sitemap?.url
+              }
+              siteUrl={searchParams.get("url") ?? undefined}
+            />
           </div>
         </div>
       </div>

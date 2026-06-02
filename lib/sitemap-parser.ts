@@ -1,5 +1,7 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
+import type { SitemapUrlWithAlternates } from "@/lib/alternate-validator";
+import type { AlternateLink } from "@/lib/alternate-validator";
 
 const SITEMAP_TIMEOUT = 15000; // 15 seconds for sitemap requests
 const MAX_SITEMAP_DEPTH = 10; // Prevent infinite recursion in nested sitemap indexes
@@ -190,6 +192,162 @@ export async function parseSitemap(sitemapUrl: string, debug: boolean = false): 
   }
 
   return await fetchSitemap(sitemapUrl);
+}
+
+function extractUrlEntriesFromDocument(
+  $: cheerio.CheerioAPI
+): SitemapUrlWithAlternates[] {
+  const entries: SitemapUrlWithAlternates[] = [];
+  const seenLocs = new Set<string>();
+
+  $("urlset > url, urlset url").each((_, urlEl) => {
+    const $urlBlock = $(urlEl);
+    const loc = $urlBlock.children("loc").first().text().trim();
+    if (!loc || seenLocs.has(loc)) return;
+    seenLocs.add(loc);
+
+    const alternates: AlternateLink[] = [];
+    const seenAlts = new Set<string>();
+
+    $urlBlock.find("link").each((_, linkEl) => {
+      const $link = $(linkEl);
+      const rel = ($link.attr("rel") || "").toLowerCase();
+      if (rel && rel !== "alternate") return;
+
+      const href = $link.attr("href");
+      if (!href?.trim()) return;
+
+      const hreflang = ($link.attr("hreflang") || "").trim();
+      try {
+        const absoluteHref = new URL(href.trim(), loc).href;
+        const key = `${hreflang.toLowerCase()}|${absoluteHref}`;
+        if (seenAlts.has(key)) return;
+        seenAlts.add(key);
+        alternates.push({ hreflang, href: absoluteHref });
+      } catch {
+        // Invalid alternate URL
+      }
+    });
+
+    entries.push({ loc, alternates });
+  });
+
+  return entries;
+}
+
+/**
+ * Parses sitemap XML and returns URL entries with hreflang alternates (xhtml:link).
+ */
+export async function parseSitemapWithAlternates(
+  sitemapUrl: string,
+  debug: boolean = false
+): Promise<SitemapUrlWithAlternates[]> {
+  const visitedSitemaps = new Set<string>();
+
+  async function fetchSitemapEntries(
+    url: string,
+    depth: number = 0
+  ): Promise<SitemapUrlWithAlternates[]> {
+    if (visitedSitemaps.has(url)) return [];
+    if (depth > MAX_SITEMAP_DEPTH) return [];
+    visitedSitemaps.add(url);
+
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        let normalizedUrl = url;
+        if (normalizedUrl.startsWith("http://")) {
+          try {
+            const httpsUrl = normalizedUrl.replace("http://", "https://");
+            const testResponse = await axios.head(httpsUrl, {
+              timeout: 5000,
+              validateStatus: () => true,
+              maxRedirects: 3,
+            });
+            if (testResponse.status === 200) normalizedUrl = httpsUrl;
+          } catch {
+            // keep http
+          }
+        }
+
+        const response = await axios.get(normalizedUrl, {
+          timeout: SITEMAP_TIMEOUT,
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; SEOValidator/1.0)",
+            Accept: "application/xml, text/xml, application/gzip, */*",
+            "Accept-Encoding": "gzip, deflate, br",
+          },
+          decompress: true,
+          validateStatus: (status) => status === 200,
+          maxRedirects: 5,
+        });
+
+        const contentText =
+          typeof response.data === "string"
+            ? response.data
+            : response.data.toString();
+
+        const contentWithoutNamespaces = contentText.replace(
+          /<(\/?)([a-zA-Z]+):([a-zA-Z]+)/g,
+          "<$1$3"
+        );
+        const $ = cheerio.load(contentWithoutNamespaces, { xmlMode: true });
+
+        const sitemapIndexEntries = $("sitemapindex > sitemap > loc, sitemap > loc");
+        const isIndex =
+          sitemapIndexEntries.length > 0 &&
+          $("urlset > url, urlset url").length === 0;
+
+        if (isIndex) {
+          const childPromises: Promise<SitemapUrlWithAlternates[]>[] = [];
+          sitemapIndexEntries.each((_, element) => {
+            const childSitemapUrl = $(element).text().trim();
+            if (!childSitemapUrl) return;
+            try {
+              const absoluteUrl = new URL(childSitemapUrl, normalizedUrl).href;
+              childPromises.push(fetchSitemapEntries(absoluteUrl, depth + 1));
+            } catch {
+              if (debug) console.warn(`[Sitemap] Invalid child sitemap URL: ${childSitemapUrl}`);
+            }
+          });
+
+          const childResults = await Promise.allSettled(childPromises);
+          return childResults
+            .filter((r): r is PromiseFulfilledResult<SitemapUrlWithAlternates[]> => r.status === "fulfilled")
+            .flatMap((r) => r.value);
+        }
+
+        const entries = extractUrlEntriesFromDocument($);
+        if (debug) {
+          const withAlts = entries.filter((e) => e.alternates.length > 0).length;
+          console.log(
+            `[Sitemap] Extracted ${entries.length} URL entries (${withAlts} with alternates) from ${normalizedUrl}`
+          );
+        }
+        return entries;
+      } catch (error: unknown) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (
+          lastError &&
+          "response" in lastError &&
+          (lastError as { response?: { status?: number } }).response?.status &&
+          [404, 403].includes((lastError as { response: { status: number } }).response.status)
+        ) {
+          throw lastError;
+        }
+        if (attempt < MAX_RETRIES - 1) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    throw new Error(
+      `Failed to fetch/parse sitemap ${url}: ${lastError?.message ?? "Unknown error"}`
+    );
+  }
+
+  return fetchSitemapEntries(sitemapUrl);
 }
 
 /**

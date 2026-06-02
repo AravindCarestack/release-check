@@ -3,12 +3,14 @@
 import { useState } from "react";
 import StatusBadge from "./StatusBadge";
 import type { PageReport } from "@/lib/page-analyzer";
+import type { AlternateValidationResult } from "@/lib/alternate-validator";
 
 interface PageCardProps {
   page: PageReport;
+  alternateValidation?: AlternateValidationResult;
 }
 
-export default function PageCard({ page }: PageCardProps) {
+export default function PageCard({ page, alternateValidation }: PageCardProps) {
   const [jsonLdExpanded, setJsonLdExpanded] = useState(false);
   const [jsonLdTypesExpanded, setJsonLdTypesExpanded] = useState(false);
   const [twitterExpanded, setTwitterExpanded] = useState(false);
@@ -146,6 +148,61 @@ export default function PageCard({ page }: PageCardProps) {
             />
         </div>
       </div>
+
+      {/* Hreflang / alternate links */}
+      {(page.alternates?.length > 0 || alternateValidation) && (
+        <div className="mb-4">
+          <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+            Alternate Links ({page.alternates?.length ?? 0})
+          </div>
+          {alternateValidation && (
+            <div
+              className={`mb-2 text-xs px-2 py-1.5 rounded border ${
+                alternateValidation.status === "pass"
+                  ? "bg-green-50 text-green-800 border-green-200"
+                  : alternateValidation.status === "warn"
+                    ? "bg-yellow-50 text-yellow-800 border-yellow-200"
+                    : alternateValidation.status === "fail"
+                      ? "bg-red-50 text-red-800 border-red-200"
+                      : "bg-gray-50 text-gray-600 border-gray-200"
+              }`}
+            >
+              Sitemap match:{" "}
+              {alternateValidation.status === "pass"
+                ? "✓ All alternates match"
+                : alternateValidation.status === "skip"
+                  ? "— URL not in sitemap"
+                  : alternateValidation.issues[0] ?? "Mismatch"}
+            </div>
+          )}
+          {alternateValidation &&
+            alternateValidation.issues.length > 0 &&
+            alternateValidation.status !== "pass" && (
+              <ul className="mb-2 text-xs text-red-700 space-y-1 list-disc list-inside">
+                {alternateValidation.issues.map((issue, i) => (
+                  <li key={i}>{issue}</li>
+                ))}
+              </ul>
+            )}
+          {page.alternates?.length > 0 ? (
+            <div className="space-y-1 max-h-32 overflow-y-auto">
+              {page.alternates.map((alt, idx) => (
+                <div
+                  key={idx}
+                  className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 break-all"
+                >
+                  <span className="font-medium">
+                    {alt.hreflang || "(no hreflang)"}:
+                  </span>{" "}
+                  {alt.href}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">No alternate links on page</p>
+          )}
+        </div>
+      )}
 
       {/* Open Graph Checks - Expandable */}
       <div className="mb-4">

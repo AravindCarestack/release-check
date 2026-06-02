@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { CheckResult, PerformanceCheck, SecurityCheck, AccessibilityCheck, AnalyticsCheck, CachingCheck } from "@/app/types";
+import type { AlternateLink } from "@/lib/alternate-validator";
 import { analyzePerformance } from "@/lib/performance-analyzer";
 import { analyzeSecurity } from "@/lib/security-analyzer";
 import { analyzeAccessibility } from "@/lib/accessibility-analyzer";
@@ -48,6 +49,7 @@ export interface PageReport {
     present: boolean;
     url: string | null;
   };
+  alternates: AlternateLink[];
   performance?: PerformanceCheck;
   security?: SecurityCheck;
   accessibility?: AccessibilityCheck;
@@ -214,6 +216,36 @@ function validateJsonLd(html: string): { valid: boolean; count: number; errors: 
 }
 
 /**
+ * Extracts hreflang alternate links from page HTML.
+ */
+function extractPageAlternates($: cheerio.CheerioAPI, pageUrl: string): AlternateLink[] {
+  const alternates: AlternateLink[] = [];
+  const seen = new Set<string>();
+
+  $('link[rel="alternate"]').each((_, element) => {
+    const href = $(element).attr("href");
+    if (!href?.trim()) return;
+
+    const hreflang = ($(element).attr("hreflang") || "").trim();
+    const media = ($(element).attr("media") || "").trim();
+    // Skip non-hreflang alternates (e.g. RSS, print) unless they have hreflang
+    if (!hreflang && media) return;
+
+    try {
+      const absoluteHref = new URL(href.trim(), pageUrl).href;
+      const key = `${hreflang.toLowerCase()}|${absoluteHref}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      alternates.push({ hreflang, href: absoluteHref });
+    } catch {
+      // Invalid URL
+    }
+  });
+
+  return alternates;
+}
+
+/**
  * Analyzes a single page's SEO elements
  */
 export async function analyzePage(
@@ -306,6 +338,8 @@ export async function analyzePage(
     }
   }
   
+  const alternates = extractPageAlternates($, url);
+
   // Check for sitemap link in HTML
   const sitemapLink = $('link[rel="sitemap"]').attr("href");
   if (sitemapLink) {
@@ -398,6 +432,7 @@ export async function analyzePage(
       present: sitemapPresent,
       url: sitemapUrl,
     },
+    alternates,
     performance,
     security,
     accessibility,
