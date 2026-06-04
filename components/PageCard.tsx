@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import StatusBadge from "./StatusBadge";
+import SeoInsightDisplay from "./SeoInsightDisplay";
 import type { PageReport } from "@/lib/page-analyzer";
 import type { AlternateValidationResult } from "@/lib/alternate-validator";
+import type { AiInsightsResult } from "@/lib/ai-insights";
 
 interface PageCardProps {
   page: PageReport;
@@ -15,14 +17,19 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
   const [jsonLdTypesExpanded, setJsonLdTypesExpanded] = useState(false);
   const [twitterExpanded, setTwitterExpanded] = useState(false);
   const [openGraphExpanded, setOpenGraphExpanded] = useState(false);
+  const [aiInsight, setAiInsight] = useState<AiInsightsResult | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [showAi, setShowAi] = useState(false);
+
   const checkForCanonical = (canonical: string, value: string) => {
     try {
       const c = new URL(canonical);
       const v = new URL(value);
-  
+
       const normalizeHost = (host: string) => host.replace(/^www\./, "").toLowerCase();
       const normalizePath = (path: string) => (path.endsWith("/") ? path.slice(0, -1) : path) || "/";
-  
+
       return (
         normalizeHost(c.hostname) === normalizeHost(v.hostname) &&
         normalizePath(c.pathname) === normalizePath(v.pathname)
@@ -31,18 +38,57 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
       return false;
     }
   };
-  const CheckItem = ({ label, hasValue, value, isWarning = false }: { label: string; hasValue: boolean; value?: string|null; isWarning?: boolean }) => (
+
+  const fetchPageInsight = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/analyze/ai-insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "page", page }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "SEO analysis failed");
+      setAiInsight(data.insights);
+      setShowAi(true);
+    } catch (e: unknown) {
+      setAiError(e instanceof Error ? e.message : "SEO analysis failed");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const CheckItem = ({
+    label,
+    hasValue,
+    value,
+    isWarning = false,
+  }: {
+    label: string;
+    hasValue: boolean;
+    value?: string | null;
+    isWarning?: boolean;
+  }) => (
     <div className="flex flex-col text-left items-baseline justify-between py-2 border-b border-gray-100 last:border-0">
-   <div className="flex items-center gap-2 justify-between">
-   <span className="text-sm text-gray-700">{label}</span>
-      {isWarning ? <span className={`text-lg font-medium text-yellow-600`}>
-        ⚠
-      </span> : <span className={`text-base font-medium ${hasValue ? "text-green-600" : "text-red-600"}`}>
-        {hasValue ? "✓" : "✗"}
-      </span>}
-   </div>
+      <div className="flex items-center gap-2 justify-between w-full">
+        <span className="text-sm text-gray-700">{label}</span>
+        {isWarning ? (
+          <span className="text-lg font-medium text-yellow-600">⚠</span>
+        ) : (
+          <span className={`text-base font-medium ${hasValue ? "text-green-600" : "text-red-600"}`}>
+            {hasValue ? "✓" : "✗"}
+          </span>
+        )}
+      </div>
       {value && (
-        <span className={`text-sm text-gray-700 ${hasValue ? "text-green-600" : "text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200 break-words"}`}>
+        <span
+          className={`text-sm text-gray-700 mt-1 break-words ${
+            hasValue && !isWarning
+              ? "text-green-600"
+              : "text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200"
+          }`}
+        >
           {value}
         </span>
       )}
@@ -52,8 +98,8 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
   return (
     <div className="bg-white rounded-md border border-gray-200 shadow-sm hover:shadow transition-shadow p-5">
       {/* Header */}
-      <div className="flex items-start justify-between mb-5 pb-4 border-b border-gray-200">
-        <div className="flex-1 min-w-0 pr-4">
+      <div className="flex items-start justify-between mb-4 pb-4 border-b border-gray-200 gap-3">
+        <div className="flex-1 min-w-0 pr-2">
           <a
             href={page.url}
             target="_blank"
@@ -63,22 +109,50 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             {page.url}
           </a>
         </div>
-        <StatusBadge status={page.status} size="sm" />
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <StatusBadge status={page.status} size="sm" />
+          <button
+            type="button"
+            onClick={fetchPageInsight}
+            disabled={aiLoading}
+            className="text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-md border border-indigo-200 transition disabled:opacity-50 whitespace-nowrap"
+          >
+            {aiLoading ? "Analyzing…" : "SEO analysis"}
+          </button>
+        </div>
       </div>
+
+      {aiError && <p className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{aiError}</p>}
+
+      {showAi && aiInsight && (
+        <div className="mb-5 p-4 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-md">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-indigo-900">Page SEO outlook</h3>
+            <button
+              type="button"
+              onClick={() => setShowAi(false)}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+            >
+              Hide
+            </button>
+          </div>
+          <SeoInsightDisplay insights={aiInsight} />
+        </div>
+      )}
 
       {/* H1 Tag Check */}
       <div className="mb-4 min-w-0">
         <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
           H1 Tags ({page.h1Count})
         </div>
-        <CheckItem 
-          label={`Single H1`} 
-          hasValue={page.hasSingleH1} 
-        />
+        <CheckItem label="Single H1" hasValue={page.hasSingleH1} />
         {page.h1Texts.length > 0 && (
           <div className="mt-2 space-y-1 min-w-0">
             {page.h1Texts.map((text, idx) => (
-              <div key={idx} className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 min-w-0 overflow-hidden">
+              <div
+                key={idx}
+                className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 min-w-0 overflow-hidden"
+              >
                 <span className="font-medium">H1 {idx + 1}:</span>{" "}
                 <span className="break-all break-words">{text}</span>
               </div>
@@ -93,23 +167,33 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           Heading Structure
         </div>
         <div className="grid grid-cols-5 gap-2 text-xs">
-          <div className={`text-center p-2 bg-gray-50 rounded border border-gray-100 ${page.headingCounts.h2 > 0 ? "border-green-500" : "border-red-600"}`}>
+          <div
+            className={`text-center p-2 bg-gray-50 rounded border border-gray-100 ${page.headingCounts.h2 > 0 ? "border-green-500" : "border-red-600"}`}
+          >
             <div className="font-semibold text-gray-700">H2</div>
             <div className="text-gray-600">{page.headingCounts.h2}</div>
           </div>
-          <div className={`text-center p-2 bg-gray-50 rounded border ${page.headingCounts.h3 > 0 ? "border-green-500" : "bg-red-600"}`}>
+          <div
+            className={`text-center p-2 bg-gray-50 rounded border ${page.headingCounts.h3 > 0 ? "border-green-500" : "bg-red-600"}`}
+          >
             <div className="font-semibold text-gray-700">H3</div>
             <div className="text-gray-600">{page.headingCounts.h3}</div>
           </div>
-          <div className={`text-center p-2 bg-gray-50 rounded border  ${page.headingCounts.h4 > 0 ? "border-green-500" : "border-red-600"}`}>
+          <div
+            className={`text-center p-2 bg-gray-50 rounded border ${page.headingCounts.h4 > 0 ? "border-green-500" : "border-red-600"}`}
+          >
             <div className="font-semibold text-gray-700">H4</div>
             <div className="text-gray-600">{page.headingCounts.h4}</div>
           </div>
-          <div className={`text-center p-2 bg-gray-50 rounded border  ${page.headingCounts.h5 > 0 ? "border-green-500" : "border-red-600"}`}>
+          <div
+            className={`text-center p-2 bg-gray-50 rounded border ${page.headingCounts.h5 > 0 ? "border-green-500" : "border-red-600"}`}
+          >
             <div className="font-semibold text-gray-700">H5</div>
             <div className="text-gray-600">{page.headingCounts.h5}</div>
           </div>
-          <div className={`text-center p-2 bg-gray-50 rounded border  ${page.headingCounts.h6 > 0 ? "border-green-500" : "border-red-600"}`}>
+          <div
+            className={`text-center p-2 bg-gray-50 rounded border ${page.headingCounts.h6 > 0 ? "border-green-500" : "border-red-600"}`}
+          >
             <div className="font-semibold text-gray-700">H6</div>
             <div className="text-gray-600">{page.headingCounts.h6}</div>
           </div>
@@ -140,12 +224,16 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
               <span className="font-medium">Keywords:</span> {page.meta.keywords}
             </div>
           )}
-          <CheckItem label="Robots" hasValue={!!page.meta.robots && !page.meta.robots.toLowerCase().includes("noindex")} />
-          <CheckItem label="Canonical"
-           hasValue={checkForCanonical(page?.meta?.canonical || "",page.url)}
+          <CheckItem
+            label="Robots"
+            hasValue={!!page.meta.robots && !page.meta.robots.toLowerCase().includes("noindex")}
+          />
+          <CheckItem
+            label="Canonical"
+            hasValue={checkForCanonical(page?.meta?.canonical || "", page.url)}
             value={page?.meta?.canonical}
-            isWarning={!checkForCanonical(page?.meta?.canonical || "",page.url)}
-            />
+            isWarning={!checkForCanonical(page?.meta?.canonical || "", page.url)}
+          />
         </div>
       </div>
 
@@ -191,10 +279,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                   key={idx}
                   className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 break-all"
                 >
-                  <span className="font-medium">
-                    {alt.hreflang || "(no hreflang)"}:
-                  </span>{" "}
-                  {alt.href}
+                  <span className="font-medium">{alt.hreflang || "(no hreflang)"}:</span> {alt.href}
                 </div>
               ))}
             </div>
@@ -210,12 +295,8 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           onClick={() => setOpenGraphExpanded(!openGraphExpanded)}
           className="flex items-center justify-between w-full text-left mb-2"
         >
-          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Open Graph
-          </div>
-          <span className="text-xs text-gray-500">
-            {openGraphExpanded ? "▼" : "▶"}
-          </span>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Open Graph</div>
+          <span className="text-xs text-gray-500">{openGraphExpanded ? "▼" : "▶"}</span>
         </button>
         {openGraphExpanded && (
           <div>
@@ -225,12 +306,12 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             {page.og.image && (
               <div className="py-2 border-b border-gray-100">
                 <div className="text-xs text-gray-700 mb-1 font-medium">OG Image:</div>
-                <img 
-                  src={page.og.image} 
-                  alt="Open Graph" 
+                <img
+                  src={page.og.image}
+                  alt="Open Graph"
                   className="w-full h-auto rounded border border-gray-200 max-h-48 object-cover"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).style.display = "none";
                   }}
                 />
               </div>
@@ -249,15 +330,16 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
               Twitter Cards
             </div>
-            {(!page.twitter.card && !page.twitter.title && !page.twitter.description && !page.twitter.image) && (
-              <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
-                ⚠ Warning
-              </span>
-            )}
+            {!page.twitter.card &&
+              !page.twitter.title &&
+              !page.twitter.description &&
+              !page.twitter.image && (
+                <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
+                  ⚠ Warning
+                </span>
+              )}
           </div>
-          <span className="text-xs text-gray-500">
-            {twitterExpanded ? "▼" : "▶"}
-          </span>
+          <span className="text-xs text-gray-500">{twitterExpanded ? "▼" : "▶"}</span>
         </button>
         {twitterExpanded && (
           <div>
@@ -265,8 +347,11 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             <CheckItem label="twitter:title" hasValue={!!page.twitter.title} />
             <CheckItem label="twitter:description" hasValue={!!page.twitter.description} />
             <CheckItem label="twitter:image" hasValue={!!page.twitter.image} />
-            
-            {(page.twitter.card || page.twitter.title || page.twitter.description || page.twitter.image) && (
+
+            {(page.twitter.card ||
+              page.twitter.title ||
+              page.twitter.description ||
+              page.twitter.image) && (
               <div className="mt-2 border-t border-gray-100 pt-2 space-y-2">
                 {page.twitter.card && (
                   <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 break-words">
@@ -286,15 +371,20 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                 {page.twitter.image && (
                   <div className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 break-words">
                     <span className="font-medium">Image:</span>{" "}
-                    <a href={page.twitter.image} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">
+                    <a
+                      href={page.twitter.image}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline break-all"
+                    >
                       {page.twitter.image}
                     </a>
-                    <img 
-                      src={page.twitter.image} 
-                      alt="Twitter Card" 
+                    <img
+                      src={page.twitter.image}
+                      alt="Twitter Card"
                       className="w-full h-auto rounded border border-gray-200 max-h-48 object-cover mt-2"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).style.display = "none";
                       }}
                     />
                   </div>
@@ -305,7 +395,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
         )}
       </div>
 
-      {/* JSON-LD Check - Expandable with content display */}
+      {/* JSON-LD Check */}
       <div className="mb-4">
         <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
           JSON-LD Structured Data
@@ -326,9 +416,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                     className="flex items-center justify-between w-full text-left text-sm text-gray-700 hover:text-gray-900"
                   >
                     <span className="font-medium">Types ({page.jsonLd.types.length}):</span>
-                    <span className="text-xs text-gray-500">
-                      {jsonLdTypesExpanded ? "▼" : "▶"}
-                    </span>
+                    <span className="text-xs text-gray-500">{jsonLdTypesExpanded ? "▼" : "▶"}</span>
                   </button>
                   {jsonLdTypesExpanded && (
                     <div className="mt-1 space-y-1">
@@ -349,7 +437,10 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                   <div className="text-xs text-red-700 font-medium mb-1">Errors:</div>
                   <div className="space-y-1">
                     {page.jsonLd.errors.map((error, idx) => (
-                      <div key={idx} className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200 break-words">
+                      <div
+                        key={idx}
+                        className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200 break-words"
+                      >
                         {error}
                       </div>
                     ))}
@@ -362,23 +453,17 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                     onClick={() => setJsonLdExpanded(!jsonLdExpanded)}
                     className="flex items-center justify-between w-full text-left text-sm text-gray-700 hover:text-gray-900"
                   >
-                    <span className="font-medium">
-                      View JSON-LD Content ({page.jsonLd.data.length}):
-                    </span>
-                    <span className="text-xs text-gray-500">
-                      {jsonLdExpanded ? "▼" : "▶"}
-                    </span>
+                    <span className="font-medium">View JSON-LD Content ({page.jsonLd.data.length}):</span>
+                    <span className="text-xs text-gray-500">{jsonLdExpanded ? "▼" : "▶"}</span>
                   </button>
                   {jsonLdExpanded && (
                     <div className="mt-2 space-y-2">
                       {page.jsonLd.data.map((item, idx) => {
                         let formattedContent = item.content;
                         try {
-                          // Try to parse and format the JSON
                           const parsed = JSON.parse(item.content);
                           formattedContent = JSON.stringify(parsed, null, 2);
                         } catch {
-                          // If parsing fails, show original content
                           formattedContent = item.content;
                         }
                         return (
@@ -409,16 +494,36 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             {page.performance.pageLoadTime && (
               <div className="flex justify-between">
                 <span className="text-gray-600">Load Time:</span>
-                <span className={page.performance.pageLoadTime.status === "pass" ? "text-green-600" : page.performance.pageLoadTime.status === "warn" ? "text-yellow-600" : "text-red-600"}>
-                  {typeof page.performance.pageLoadTime.value === "number" ? `${page.performance.pageLoadTime.value}ms` : "-"}
+                <span
+                  className={
+                    page.performance.pageLoadTime.status === "pass"
+                      ? "text-green-600"
+                      : page.performance.pageLoadTime.status === "warn"
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                  }
+                >
+                  {typeof page.performance.pageLoadTime.value === "number"
+                    ? `${page.performance.pageLoadTime.value}ms`
+                    : "-"}
                 </span>
               </div>
             )}
             {page.performance.totalPageSize && (
               <div className="flex justify-between">
                 <span className="text-gray-600">Page Size:</span>
-                <span className={page.performance.totalPageSize.status === "pass" ? "text-green-600" : page.performance.totalPageSize.status === "warn" ? "text-yellow-600" : "text-red-600"}>
-                  {typeof page.performance.totalPageSize.value === "number" ? `${page.performance.totalPageSize.value.toFixed(2)}MB` : "-"}
+                <span
+                  className={
+                    page.performance.totalPageSize.status === "pass"
+                      ? "text-green-600"
+                      : page.performance.totalPageSize.status === "warn"
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                  }
+                >
+                  {typeof page.performance.totalPageSize.value === "number"
+                    ? `${page.performance.totalPageSize.value.toFixed(2)}MB`
+                    : "-"}
                 </span>
               </div>
             )}
@@ -435,14 +540,28 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-600">HTTPS:</span>
-              <span className={page.security.sslCertificate?.status === "pass" ? "text-green-600" : "text-yellow-600"}>
+              <span
+                className={
+                  page.security.sslCertificate?.status === "pass" ? "text-green-600" : "text-yellow-600"
+                }
+              >
                 {page.security.sslCertificate?.status === "pass" ? "✓" : "⚠"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Security Headers:</span>
-              <span className={page.security.contentSecurityPolicy?.status === "pass" && page.security.xFrameOptions?.status === "pass" ? "text-green-600" : "text-yellow-600"}>
-                {page.security.contentSecurityPolicy?.status === "pass" && page.security.xFrameOptions?.status === "pass" ? "✓" : "⚠"}
+              <span
+                className={
+                  page.security.contentSecurityPolicy?.status === "pass" &&
+                  page.security.xFrameOptions?.status === "pass"
+                    ? "text-green-600"
+                    : "text-yellow-600"
+                }
+              >
+                {page.security.contentSecurityPolicy?.status === "pass" &&
+                page.security.xFrameOptions?.status === "pass"
+                  ? "✓"
+                  : "⚠"}
               </span>
             </div>
           </div>
@@ -458,13 +577,29 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-600">Alt Text:</span>
-              <span className={page.accessibility.altText?.status === "pass" ? "text-green-600" : page.accessibility.altText?.status === "warn" ? "text-yellow-600" : "text-red-600"}>
-                {page.accessibility.altText?.status === "pass" ? "✓" : page.accessibility.altText?.status === "warn" ? "⚠" : "✗"}
+              <span
+                className={
+                  page.accessibility.altText?.status === "pass"
+                    ? "text-green-600"
+                    : page.accessibility.altText?.status === "warn"
+                      ? "text-yellow-600"
+                      : "text-red-600"
+                }
+              >
+                {page.accessibility.altText?.status === "pass"
+                  ? "✓"
+                  : page.accessibility.altText?.status === "warn"
+                    ? "⚠"
+                    : "✗"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Form Labels:</span>
-              <span className={page.accessibility.formLabels?.status === "pass" ? "text-green-600" : "text-yellow-600"}>
+              <span
+                className={
+                  page.accessibility.formLabels?.status === "pass" ? "text-green-600" : "text-yellow-600"
+                }
+              >
                 {page.accessibility.formLabels?.status === "pass" ? "✓" : "⚠"}
               </span>
             </div>
@@ -481,13 +616,21 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           <div className="space-y-1 text-xs">
             <div className="flex justify-between">
               <span className="text-gray-600">Google Analytics:</span>
-              <span className={page.analytics.googleAnalytics?.status === "pass" ? "text-green-600" : "text-gray-400"}>
+              <span
+                className={
+                  page.analytics.googleAnalytics?.status === "pass" ? "text-green-600" : "text-gray-400"
+                }
+              >
                 {page.analytics.googleAnalytics?.status === "pass" ? "✓" : "-"}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Consent:</span>
-              <span className={page.analytics.trackingConsent?.status === "pass" ? "text-green-600" : "text-yellow-600"}>
+              <span
+                className={
+                  page.analytics.trackingConsent?.status === "pass" ? "text-green-600" : "text-yellow-600"
+                }
+              >
                 {page.analytics.trackingConsent?.status === "pass" ? "✓" : "⚠"}
               </span>
             </div>
@@ -503,18 +646,13 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           </div>
           <ul className="space-y-1.5">
             {page.issues.slice(0, 5).map((issue, index) => (
-              <li
-                key={index}
-                className="text-xs text-gray-600 flex items-start gap-2"
-              >
+              <li key={index} className="text-xs text-gray-600 flex items-start gap-2">
                 <span className="text-red-500 mt-0.5">•</span>
                 <span>{issue}</span>
               </li>
             ))}
             {page.issues.length > 5 && (
-              <li className="text-xs text-gray-500">
-                ... and {page.issues.length - 5} more
-              </li>
+              <li className="text-xs text-gray-500">... and {page.issues.length - 5} more</li>
             )}
           </ul>
         </div>

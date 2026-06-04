@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import PageCard from "./PageCard";
+import AiInsightsPanel from "./AiInsightsPanel";
 import type { PageReport } from "@/lib/page-analyzer";
 import { groupPagesByLocale, sortLocaleGroups, detectLocale } from "@/lib/locale-detector";
 import {
@@ -155,6 +156,8 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
 
   return (
     <div>
+      <AiInsightsPanel pages={pages} />
+
       {/* Stats and Filters */}
       <div className="mb-6 space-y-4">
         {/* Stats */}
