@@ -6,7 +6,8 @@ A production-ready Next.js 14 web application that audits websites for SEO and t
 
 - **Single Page Analysis**
   - Meta tags (title, description, robots, canonical)
-  - Open Graph tags for social media sharing
+  - Open Graph tags for social media sharing 
+  - test line
   - Twitter Card tags
   - Robots.txt and indexing configuration
   - Link health checking (internal/external, broken links)
