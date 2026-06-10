@@ -113,6 +113,7 @@ npm start
 ### Robots & Indexing
 - robots.txt existence
 - Disallow: / detection
+- Disallow: /*?* (blocks query parameter URLs from crawling)
 - Sitemap reference
 - Meta robots noindex check
 

@@ -22,6 +22,7 @@ interface CrawlResult {
   robotsTxt?: {
     present: boolean;
     content: string | null;
+    disallowQueryParams?: boolean;
   };
   pages: PageReport[];
 }
@@ -466,6 +467,25 @@ function ResultsContent() {
                     {crawlResult.robotsTxt.present ? "✓ Present" : "✗ Not Found"}
                   </span>
                 </div>
+                {crawlResult.robotsTxt.present && (
+                  <div className="mb-3 flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Disallow: /*?*
+                      </p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Blocks URLs with query strings (e.g. /products?sort=price)
+                      </p>
+                    </div>
+                    <span className={`text-sm font-medium px-3 py-1 rounded-md ${
+                      crawlResult.robotsTxt.disallowQueryParams
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}>
+                      {crawlResult.robotsTxt.disallowQueryParams ? "✓ Present" : "⚠ Missing"}
+                    </span>
+                  </div>
+                )}
                 {crawlResult.robotsTxt.present && crawlResult.robotsTxt.content && (
                   <div className="mt-3">
                     <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-words font-mono">

@@ -3,6 +3,7 @@ import { analyzeWebsite } from "@/lib/seo-analyzer";
 import { crawlWebsite } from "@/lib/crawler-sitemap-first";
 import { analyzePage } from "@/lib/page-analyzer";
 import type { PageReport } from "@/lib/page-analyzer";
+import { hasDisallowQueryParams } from "@/lib/robots-parser";
 
 // Increase timeout for browser-based crawling (can take longer)
 export const maxDuration = 300; // 5 minutes (Vercel limit)
@@ -177,6 +178,9 @@ export async function GET(request: NextRequest) {
         robotsTxt: {
           present: robotsTxtPresent,
           content: robotsTxtContent,
+          disallowQueryParams: robotsTxtContent
+            ? hasDisallowQueryParams(robotsTxtContent)
+            : false,
         },
         crawlStatistics: {
           sitemapFound: crawlStatistics.sitemapFound,

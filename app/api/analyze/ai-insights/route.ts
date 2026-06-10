@@ -9,7 +9,7 @@ import {
 export async function POST(request: NextRequest) {
   if (!isAiInsightsConfigured()) {
     return NextResponse.json(
-      { error: "AI insights unavailable. Set SEO_VALIDATE_KEY in your environment." },
+      { error: "AI insights unavailable. Please contact support." },
       { status: 503 }
     );
   }

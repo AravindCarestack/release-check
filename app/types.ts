@@ -43,6 +43,7 @@ export interface TwitterCheck {
 export interface RobotsCheck {
   robotsTxtExists: CheckResult;
   disallowAll: CheckResult;
+  disallowQueryParams: CheckResult;
   sitemapReference: CheckResult;
   noindexMeta: CheckResult;
 }

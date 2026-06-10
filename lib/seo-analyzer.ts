@@ -21,6 +21,7 @@ import { analyzeSecurity } from "@/lib/security-analyzer";
 import { analyzeAccessibility } from "@/lib/accessibility-analyzer";
 import { analyzeAnalytics } from "@/lib/analytics-analyzer";
 import { analyzeCaching } from "@/lib/caching-analyzer";
+import { hasDisallowAll, hasDisallowQueryParams } from "@/lib/robots-parser";
 
 const TIMEOUT = 30000; // 30 seconds
 const MAX_REDIRECTS = 5;
@@ -429,6 +430,7 @@ async function analyzeRobots(
   const robotsUrl = new URL("/robots.txt", baseUrl).href;
   let robotsTxtExists = false;
   let disallowAll = false;
+  let disallowQueryParams = false;
   let sitemapReference = false;
 
   try {
@@ -437,9 +439,13 @@ async function analyzeRobots(
       validateStatus: (status) => status === 200,
     });
     robotsTxtExists = true;
-    const robotsContent = robotsResponse.data.toLowerCase();
-    disallowAll = robotsContent.includes("disallow: /");
-    sitemapReference = robotsContent.includes("sitemap:");
+    const robotsContent =
+      typeof robotsResponse.data === "string"
+        ? robotsResponse.data
+        : String(robotsResponse.data);
+    disallowAll = hasDisallowAll(robotsContent);
+    disallowQueryParams = hasDisallowQueryParams(robotsContent);
+    sitemapReference = robotsContent.toLowerCase().includes("sitemap:");
   } catch {
     // robots.txt doesn't exist or is inaccessible
   }
@@ -450,6 +456,7 @@ async function analyzeRobots(
   const checks: RobotsCheck = {
     robotsTxtExists: checkRobotsTxt(robotsTxtExists, passed, warnings, failed),
     disallowAll: checkDisallowAll(disallowAll, passed, warnings, failed),
+    disallowQueryParams: checkDisallowQueryParams(disallowQueryParams, passed, warnings, failed),
     sitemapReference: checkSitemapReference(sitemapReference, passed, warnings, failed),
     noindexMeta: checkNoindexMeta(noindexMeta, passed, warnings, failed),
   };
@@ -488,6 +495,29 @@ function checkDisallowAll(disallowAll: boolean, passed: string[], warnings: stri
     status: "pass",
     message: "robots.txt does not disallow all crawlers",
     value: false,
+  };
+}
+
+function checkDisallowQueryParams(
+  hasRule: boolean,
+  passed: string[],
+  warnings: string[],
+  failed: string[]
+): CheckResult {
+  if (hasRule) {
+    passed.push("robots.txt blocks query parameter URLs");
+    return {
+      status: "pass",
+      message: "robots.txt contains 'Disallow: /*?*'",
+      value: true,
+    };
+  }
+  warnings.push("robots.txt missing Disallow: /*?*");
+  return {
+    status: "warn",
+    message: "robots.txt does not block query parameter URLs",
+    recommendation:
+      "Add 'Disallow: /*?*' to robots.txt to prevent crawlers from indexing URLs with query strings (e.g. /products?sort=price, /blog/post-1?utm_source=google)",
   };
 }
 
