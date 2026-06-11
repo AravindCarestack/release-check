@@ -6,6 +6,7 @@ import SeoInsightDisplay from "./SeoInsightDisplay";
 import type { PageReport } from "@/lib/page-analyzer";
 import type { AlternateValidationResult } from "@/lib/alternate-validator";
 import type { AiInsightsResult } from "@/lib/ai-insights";
+import { buildPageSummary } from "@/lib/ai-insights-summary";
 
 interface PageCardProps {
   page: PageReport;
@@ -46,7 +47,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
       const res = await fetch("/api/analyze/ai-insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "page", page }),
+        body: JSON.stringify({ mode: "page", summary: buildPageSummary(page) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "SEO analysis failed");

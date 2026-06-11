@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { PageReport } from "@/lib/page-analyzer";
 import type { AiInsightsResult } from "@/lib/ai-insights";
+import { buildCrawlSummary } from "@/lib/ai-insights-summary";
 import SeoInsightDisplay from "./SeoInsightDisplay";
 
 interface AiInsightsPanelProps {
@@ -22,7 +23,7 @@ export default function AiInsightsPanel({ pages }: AiInsightsPanelProps) {
       const response = await fetch("/api/analyze/ai-insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "crawl", pages }),
+        body: JSON.stringify({ mode: "crawl", summary: buildCrawlSummary(pages) }),
       });
       const data = await response.json();
       if (!response.ok) {

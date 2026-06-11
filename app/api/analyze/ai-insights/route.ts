@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { PageReport } from "@/lib/page-analyzer";
 import {
-  generateCrawlInsights,
-  generatePageInsights,
+  generateCrawlInsightsFromSummary,
+  generatePageInsightsFromSummary,
   isAiInsightsConfigured,
 } from "@/lib/ai-insights";
 
@@ -16,25 +15,24 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { mode, pages, page } = body as {
+    const { mode, summary } = body as {
       mode?: "crawl" | "page";
-      pages?: PageReport[];
-      page?: PageReport;
+      summary?: string;
     };
 
-    if (mode === "page" && page?.url) {
-      const insights = await generatePageInsights(page as PageReport);
-      return NextResponse.json({ insights });
-    }
-
-    if (!pages?.length) {
+    if (!summary?.trim()) {
       return NextResponse.json(
-        { error: "No pages provided for crawl insights" },
+        { error: "No audit summary provided" },
         { status: 400 }
       );
     }
 
-    const insights = await generateCrawlInsights(pages as PageReport[]);
+    if (mode === "page") {
+      const insights = await generatePageInsightsFromSummary(summary);
+      return NextResponse.json({ insights });
+    }
+
+    const insights = await generateCrawlInsightsFromSummary(summary);
     return NextResponse.json({ insights });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "AI insights failed";
