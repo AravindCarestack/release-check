@@ -42,6 +42,7 @@ async function analyzePagesConcurrently(
             twitter: { card: null, title: null, description: null, image: null },
             jsonLd: { present: false, valid: false, count: 0, errors: [], types: [], data: [] },
             sitemap: { present: false, url: null },
+            images: { count: 0, missingAlt: 0, emptyAlt: 0 },
             alternates: [],
             issues: ["Failed to analyze page"],
             status: "fail" as const,

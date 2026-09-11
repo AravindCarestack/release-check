@@ -55,6 +55,11 @@ export interface PageReport {
   accessibility?: AccessibilityCheck;
   analytics?: AnalyticsCheck;
   caching?: CachingCheck;
+  images: {
+    count: number;
+    missingAlt: number;
+    emptyAlt: number;
+  };
   issues: string[];
   status: "pass" | "warn" | "fail";
 }
@@ -302,6 +307,16 @@ export async function analyzePage(
     issues.push("Missing canonical URL");
   }
 
+  let imageCount = 0;
+  let missingAlt = 0;
+  let emptyAlt = 0;
+  $("img").each((_, el) => {
+    imageCount++;
+    const alt = $(el).attr("alt");
+    if (alt === undefined) missingAlt++;
+    else if (!alt.trim()) emptyAlt++;
+  });
+
   // Analyze Open Graph tags
   // Note: Missing OG tags are shown as warnings in the UI but don't contribute to fail status
   const ogTitle = $('meta[property="og:title"]').attr("content") || null;
@@ -438,6 +453,11 @@ export async function analyzePage(
     accessibility,
     analytics,
     caching,
+    images: {
+      count: imageCount,
+      missingAlt,
+      emptyAlt,
+    },
     issues,
     status,
   };

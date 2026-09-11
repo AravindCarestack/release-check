@@ -22,7 +22,9 @@ type FilterType =
   | "missingH1"
   | "missingDescription"
   | "canonicalWarning"
-  | "alternateIssue";
+  | "alternateIssue"
+  | "missingOgImage"
+  | "imageAltIssue";
 
 function hasCanonicalWarning(page: PageReport): boolean {
   const canonical = page?.meta?.canonical;
@@ -118,6 +120,10 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
         return pages.filter((p) => hasCanonicalWarning(p));
       case "alternateIssue":
         return pages.filter((p) => hasAlternateIssue(alternateValidations.get(p.url)));
+      case "missingOgImage":
+        return pages.filter((p) => !p.og.image);
+      case "imageAltIssue":
+        return pages.filter((p) => (p.images?.missingAlt ?? 0) + (p.images?.emptyAlt ?? 0) > 0);
       default:
         return pages;
     }
@@ -262,6 +268,26 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
             Canonical Warning
           </button>
           <button
+            onClick={() => setFilter("missingOgImage")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+              filter === "missingOgImage"
+                ? "bg-blue-600 text-white"
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Missing OG Image
+          </button>
+          <button
+            onClick={() => setFilter("imageAltIssue")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+              filter === "imageAltIssue"
+                ? "bg-blue-600 text-white"
+                : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Image Alt Issues
+          </button>
+          <button
             type="button"
             onClick={runAlternateValidation}
             disabled={validatingAlternates || pages.length === 0}
@@ -312,7 +338,13 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
           {filter !== "all" && (
             <span className="ml-2 text-gray-500">
               (Status:{" "}
-              {filter === "alternateIssue" ? "Alternate issues" : filter})
+              {filter === "alternateIssue"
+                ? "Alternate issues"
+                : filter === "missingOgImage"
+                  ? "Missing OG image"
+                  : filter === "imageAltIssue"
+                    ? "Image alt issues"
+                    : filter})
             </span>
           )}
         </div>
@@ -368,7 +400,7 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
               </div>
               
               {/* Pages Grid for this locale */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
                 {group.pages.map((page, index) => (
                   <PageCard
                     key={`${page.url}-${index}`}
@@ -382,7 +414,7 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
         </div>
       ) : (
         // Show filtered pages in a single grid (when a specific locale is selected or no multiple locales)
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
           {filteredPages.map((page, index) => (
             <PageCard
               key={`${page.url}-${index}`}
