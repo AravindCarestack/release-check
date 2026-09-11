@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { crawlWebsite } from "@/lib/crawler-sitemap-first";
 import { analyzePage } from "@/lib/page-analyzer";
+import { looksLikeSitemapUrl } from "@/lib/sitemap-parser";
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,9 @@ export async function GET(request: NextRequest) {
           let normalizedUrl = url.trim();
           if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
             normalizedUrl = `https://${normalizedUrl}`;
+          }
+          if (looksLikeSitemapUrl(normalizedUrl)) {
+            normalizedUrl = `${new URL(normalizedUrl).origin}/`;
           }
           const baseUrl = new URL(normalizedUrl);
 

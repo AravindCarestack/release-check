@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeWebsite } from "@/lib/seo-analyzer";
 import { crawlWebsite } from "@/lib/crawler-sitemap-first";
+import { looksLikeSitemapUrl } from "@/lib/sitemap-parser";
 import { analyzePage } from "@/lib/page-analyzer";
 import type { PageReport } from "@/lib/page-analyzer";
 import { hasDisallowQueryParams } from "@/lib/robots-parser";
@@ -85,6 +86,9 @@ export async function GET(request: NextRequest) {
       if (!normalizedUrl.startsWith("http://") && !normalizedUrl.startsWith("https://")) {
         normalizedUrl = `https://${normalizedUrl}`;
       }
+      if (looksLikeSitemapUrl(normalizedUrl)) {
+        normalizedUrl = `${new URL(normalizedUrl).origin}/`;
+      }
       const baseUrl = new URL(normalizedUrl);
 
       // Check for sitemap at site level and fetch robots.txt
@@ -160,20 +164,23 @@ export async function GET(request: NextRequest) {
       
       console.log(`[API] Analyzed ${pageReports.length} pages`);
 
+      const resolvedSitemapUrl = crawlStatistics.sitemapUrl || sitemapUrl;
+      const sitemapPresentResolved = crawlStatistics.sitemapFound || sitemapPresent;
+
       // Add sitemap info to all pages (site-level check)
       const pagesWithSitemap = pageReports.map(page => ({
         ...page,
         sitemap: {
-          present: sitemapPresent,
-          url: sitemapUrl,
+          present: sitemapPresentResolved,
+          url: resolvedSitemapUrl,
         },
       }));
 
       return NextResponse.json({
         totalPages: pagesWithSitemap.length,
         sitemap: {
-          present: sitemapPresent,
-          url: sitemapUrl,
+          present: sitemapPresentResolved,
+          url: resolvedSitemapUrl,
         },
         robotsTxt: {
           present: robotsTxtPresent,
@@ -186,6 +193,8 @@ export async function GET(request: NextRequest) {
           sitemapFound: crawlStatistics.sitemapFound,
           sitemapUrl: crawlStatistics.sitemapUrl,
           sitemapUrlCount: crawlStatistics.sitemapUrlCount,
+          sitemapIsIndex: crawlStatistics.sitemapIsIndex,
+          childSitemaps: crawlStatistics.childSitemaps,
           htmlDiscoveredCount: crawlStatistics.htmlDiscoveredCount,
           totalDiscovered: crawlStatistics.totalDiscovered,
           totalCrawled: crawlStatistics.totalCrawled,

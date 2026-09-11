@@ -18,6 +18,9 @@ interface CrawlResult {
   };
   crawlStatistics?: {
     sitemapUrl?: string | null;
+    sitemapUrlCount?: number;
+    sitemapIsIndex?: boolean;
+    childSitemaps?: string[];
   };
   robotsTxt?: {
     present: boolean;
@@ -373,20 +376,42 @@ function ResultsContent() {
                   </div>
                 )}
                 {crawlResult.sitemap && (
-                  <div className="flex items-center gap-2">
-                    <span className={`text-sm font-medium ${crawlResult.sitemap.present ? "text-green-600" : "text-red-600"}`}>
-                      {crawlResult.sitemap.present ? "✓" : "✗"} Sitemap: {crawlResult.sitemap.present ? "Found" : "Not Found"}
-                    </span>
-                    {crawlResult.sitemap.url && (
-                      <a
-                        href={crawlResult.sitemap.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline"
-                      >
-                        {crawlResult.sitemap.url}
-                      </a>
-                    )}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-sm font-medium ${crawlResult.sitemap.present ? "text-green-600" : "text-red-600"}`}>
+                        {crawlResult.sitemap.present ? "✓" : "✗"}{" "}
+                        {crawlResult.crawlStatistics?.sitemapIsIndex
+                          ? `Sitemap index: Found (${crawlResult.crawlStatistics.childSitemaps?.length ?? 0} child sitemaps, ${crawlResult.crawlStatistics.sitemapUrlCount ?? 0} URLs)`
+                          : `Sitemap: ${crawlResult.sitemap.present ? "Found" : "Not Found"}`}
+                      </span>
+                      {crawlResult.sitemap.url && (
+                        <a
+                          href={crawlResult.sitemap.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline"
+                        >
+                          {crawlResult.sitemap.url}
+                        </a>
+                      )}
+                    </div>
+                    {crawlResult.crawlStatistics?.sitemapIsIndex &&
+                      (crawlResult.crawlStatistics.childSitemaps?.length ?? 0) > 0 && (
+                        <ul className="pl-4 space-y-0.5">
+                          {crawlResult.crawlStatistics.childSitemaps!.map((child) => (
+                            <li key={child}>
+                              <a
+                                href={child}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-600 hover:underline"
+                              >
+                                {child}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                   </div>
                 )}
               </div>

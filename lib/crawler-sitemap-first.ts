@@ -1,5 +1,5 @@
 import axios from "axios";
-import { parseSitemap, discoverSitemap } from "./sitemap-parser";
+import { parseSitemapDetailed, discoverSitemap, looksLikeSitemapUrl } from "./sitemap-parser";
 import { canonicalizeUrl, shouldCrawlUrl, type NormalizeOptions } from "./url-normalizer";
 
 const TIMEOUT = 15000; // 15 seconds per page
@@ -21,6 +21,8 @@ export interface CrawlStatistics {
   sitemapFound: boolean;
   sitemapUrl: string | null;
   sitemapUrlCount: number;
+  sitemapIsIndex: boolean;
+  childSitemaps: string[];
   htmlDiscoveredCount: number;
   totalDiscovered: number;
   totalCrawled: number;
@@ -76,6 +78,8 @@ export async function crawlWebsite(
     sitemapFound: false,
     sitemapUrl: null,
     sitemapUrlCount: 0,
+    sitemapIsIndex: false,
+    childSitemaps: [],
     htmlDiscoveredCount: 0,
     totalDiscovered: 0,
     totalCrawled: 0,
@@ -88,6 +92,11 @@ export async function crawlWebsite(
     let normalizedRoot = rootUrl.trim();
     if (!normalizedRoot.startsWith("http://") && !normalizedRoot.startsWith("https://")) {
       normalizedRoot = `https://${normalizedRoot}`;
+    }
+
+    // If the user pasted a sitemap URL, crawl the site origin instead
+    if (looksLikeSitemapUrl(normalizedRoot)) {
+      normalizedRoot = new URL(normalizedRoot).origin + "/";
     }
     
     baseUrl = new URL(normalizedRoot);
@@ -136,10 +145,21 @@ export async function crawlWebsite(
     if (debug) console.log(`[SitemapCrawler] ✓ Found sitemap: ${sitemapUrl}`);
     
     try {
-      const sitemapUrls = await parseSitemap(sitemapUrl, debug);
+      const sitemapResult = await parseSitemapDetailed(sitemapUrl, debug);
+      const sitemapUrls = sitemapResult.urls;
       statistics.sitemapUrlCount = sitemapUrls.length;
+      statistics.sitemapIsIndex = sitemapResult.isIndex;
+      statistics.childSitemaps = sitemapResult.childSitemaps;
       if (debug) {
-        console.log(`[SitemapCrawler] ✓ Extracted ${sitemapUrls.length} URLs from sitemap`);
+        if (sitemapResult.isIndex) {
+          console.log(
+            `[SitemapCrawler] ✓ Sitemap index with ${sitemapResult.childSitemaps.length} child sitemaps`
+          );
+          sitemapResult.childSitemaps.forEach((child) => {
+            console.log(`[SitemapCrawler]   - ${child}`);
+          });
+        }
+        console.log(`[SitemapCrawler] ✓ Extracted ${sitemapUrls.length} page URLs from sitemap`);
         if (sitemapUrls.length > 0 && sitemapUrls.length <= 10) {
           console.log(`[SitemapCrawler] Sample URLs:`, sitemapUrls.slice(0, 5));
         }
