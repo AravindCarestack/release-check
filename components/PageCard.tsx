@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import StatusBadge from "./StatusBadge";
 import SeoInsightDisplay from "./SeoInsightDisplay";
 import type { PageReport } from "@/lib/page-analyzer";
@@ -71,7 +72,7 @@ function PreviewImage({ src, label }: { src: string | null; label: string }) {
 }
 
 export default function PageCard({ page, alternateValidation }: PageCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [jsonLdExpanded, setJsonLdExpanded] = useState(false);
   const [jsonLdTypesExpanded, setJsonLdTypesExpanded] = useState(false);
   const [twitterExpanded, setTwitterExpanded] = useState(false);
@@ -141,6 +142,23 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
     }
   };
 
+  useEffect(() => {
+    if (!detailsOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDetailsOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [detailsOpen]);
+
   const CheckItem = ({
     label,
     hasValue,
@@ -176,7 +194,11 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
   );
 
   return (
-    <div className={`bg-white rounded-md shadow-sm hover:shadow transition-shadow overflow-hidden ${cardBorderClass}`}>
+    <>
+    <article
+      className={`bg-white rounded-md shadow-sm hover:shadow-md transition-shadow overflow-hidden cursor-pointer group ${cardBorderClass}`}
+      onClick={() => setDetailsOpen(true)}
+    >
       <div className="relative aspect-[16/7] bg-gray-100 border-b border-gray-200">
         <PreviewImage src={previewImage} label="OG / Twitter image" />
         <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
@@ -211,6 +233,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           href={page.url}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={(event) => event.stopPropagation()}
           className="text-xs text-blue-600 hover:text-blue-700 hover:underline font-medium truncate block"
           title={page.url}
         >
@@ -254,48 +277,101 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2 mt-3">
-          <button
-            type="button"
-            onClick={fetchPageInsight}
-            disabled={aiLoading}
-            className="text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition disabled:opacity-50"
-          >
-            {aiLoading ? "Analyzing…" : "SEO analysis"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setExpanded((open) => !open)}
-            className="text-xs font-medium text-gray-700 hover:text-gray-900 px-2 py-1"
-          >
-            {expanded ? "Hide details" : "Details"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setDetailsOpen(true);
+          }}
+          className="mt-3 text-xs text-gray-500 group-hover:text-gray-800 font-medium"
+        >
+          View details
+        </button>
+      </div>
+    </article>
 
-        {aiError && (
-          <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
-            {aiError}
-          </p>
-        )}
-
-        {showAi && aiInsight && (
-          <div className="mt-3 p-3 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-md">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-semibold text-indigo-900">Page SEO outlook</h4>
-              <button
-                type="button"
-                onClick={() => setShowAi(false)}
-                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-              >
-                Hide
-              </button>
+    {detailsOpen &&
+      createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-4 bg-black/50 overflow-y-auto"
+          onClick={() => setDetailsOpen(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="page-details-title"
+            className="relative bg-white rounded-lg shadow-xl w-[92vw] max-w-7xl my-6 overflow-hidden"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 bg-white border-b border-gray-200">
+              <div className="min-w-0">
+                <a
+                  href={page.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-700 hover:underline font-medium truncate block"
+                  title={page.url}
+                >
+                  {displayPath(page.url)}
+                </a>
+                <h2 id="page-details-title" className="text-lg font-semibold text-gray-900 mt-0.5 break-words">
+                  {pageTitle}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <StatusBadge status={page.status} size="sm" />
+                <button
+                  type="button"
+                  onClick={() => setDetailsOpen(false)}
+                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  aria-label="Close details"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <SeoInsightDisplay insights={aiInsight} />
-          </div>
-        )}
 
-        {expanded && (
-          <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="p-5 max-h-[calc(90vh-5rem)] overflow-y-auto">
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={fetchPageInsight}
+                  disabled={aiLoading}
+                  className="text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition disabled:opacity-50"
+                >
+                  {aiLoading ? "Analyzing…" : "SEO analysis"}
+                </button>
+                {isPerfect && (
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-600 text-white">
+                    All good
+                  </span>
+                )}
+              </div>
+
+              {aiError && (
+                <p className="mb-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
+                  {aiError}
+                </p>
+              )}
+
+              {showAi && aiInsight && (
+                <div className="mb-4 p-3 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-md">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-indigo-900">Page SEO outlook</h4>
+                    <button
+                      type="button"
+                      onClick={() => setShowAi(false)}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                    >
+                      Hide
+                    </button>
+                  </div>
+                  <SeoInsightDisplay insights={aiInsight} />
+                </div>
+              )}
+
             <div className="mb-4">
               <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                 Images
@@ -740,21 +816,20 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                   Issues ({page.issues.length})
                 </div>
                 <ul className="space-y-1.5">
-                  {page.issues.slice(0, 5).map((issue, index) => (
+                  {page.issues.map((issue, index) => (
                     <li key={index} className="text-xs text-gray-600 flex items-start gap-2">
                       <span className="text-red-500 mt-0.5">•</span>
                       <span>{issue}</span>
                     </li>
                   ))}
-                  {page.issues.length > 5 && (
-                    <li className="text-xs text-gray-500">... and {page.issues.length - 5} more</li>
-                  )}
                 </ul>
               </div>
             )}
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
