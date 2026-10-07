@@ -16,7 +16,7 @@ const MAX_CONCURRENT_ANALYSIS = 5;
  * Analyzes multiple pages concurrently with rate limiting
  */
 async function analyzePagesConcurrently(
-  pages: Array<{ url: string; html: string }>,
+  pages: Array<{ url: string; html: string; statusCode?: number | null }>,
   baseUrl: URL,
   maxConcurrent: number = MAX_CONCURRENT_ANALYSIS
 ): Promise<PageReport[]> {
@@ -28,7 +28,7 @@ async function analyzePagesConcurrently(
     const batchResults = await Promise.all(
       batch.map(async (page) => {
         try {
-          return await analyzePage(page.html, page.url, baseUrl);
+          return await analyzePage(page.html, page.url, baseUrl, undefined, page.statusCode);
         } catch (error) {
           // Return a failed report if analysis fails
           return {
@@ -46,6 +46,7 @@ async function analyzePagesConcurrently(
             alternates: [],
             issues: ["Failed to analyze page"],
             status: "fail" as const,
+            statusCode: page.statusCode ?? null,
           };
         }
       })
@@ -159,6 +160,7 @@ export async function GET(request: NextRequest) {
       const pagesToAnalyze = crawledPages.map((page) => ({
         url: page.url,
         html: page.html,
+        statusCode: page.statusCode,
       }));
 
       const pageReports = await analyzePagesConcurrently(pagesToAnalyze, baseUrl);

@@ -16,7 +16,7 @@ export default function ScoreBadge({ count, label, color }: ScoreBadgeProps) {
       <span className={`${colorClasses[color]} px-3 py-1 rounded-md text-sm font-medium`}>
         {count}
       </span>
-      <span className="text-gray-700 font-medium text-sm">{label}</span>
+      <span className="text-gray-300 font-medium text-sm">{label}</span>
     </div>
   );
 }

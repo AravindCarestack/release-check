@@ -13,17 +13,17 @@ export default function StatusBadge({ status, size = "md" }: StatusBadgeProps) {
   const statusConfig = {
     pass: {
       label: "Pass",
-      className: "bg-green-50 text-green-700 border border-green-200",
+      className: "bg-green-950/50 text-green-300 border border-green-800",
       icon: "✓",
     },
     warn: {
       label: "Warn",
-      className: "bg-yellow-50 text-yellow-700 border border-yellow-200",
+      className: "bg-yellow-950/50 text-yellow-300 border border-yellow-800",
       icon: "⚠",
     },
     fail: {
       label: "Fail",
-      className: "bg-red-50 text-red-700 border border-red-200",
+      className: "bg-red-950/50 text-red-300 border border-red-800",
       icon: "✗",
     },
   };

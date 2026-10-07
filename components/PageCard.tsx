@@ -40,10 +40,10 @@ function Chip({
   tone: "pass" | "warn" | "fail" | "neutral";
 }) {
   const tones = {
-    pass: "bg-green-50 text-green-700 border-green-200",
-    warn: "bg-yellow-50 text-yellow-800 border-yellow-200",
-    fail: "bg-red-50 text-red-700 border-red-200",
-    neutral: "bg-gray-50 text-gray-600 border-gray-200",
+    pass: "bg-green-950/50 text-green-300 border-green-800",
+    warn: "bg-yellow-950/50 text-yellow-300 border-yellow-800",
+    fail: "bg-red-950/50 text-red-300 border-red-800",
+    neutral: "bg-gray-800 text-gray-400 border-gray-700",
   };
   return (
     <span className={`text-[11px] leading-none px-1.5 py-1 rounded border ${tones[tone]}`}>
@@ -56,7 +56,7 @@ function PreviewImage({ src, label }: { src: string | null; label: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-gray-50 text-[11px] text-gray-400">
+      <div className="w-full h-full flex items-center justify-center bg-gray-800 text-[11px] text-gray-400">
         No {label}
       </div>
     );
@@ -102,10 +102,10 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
   const cardBorderClass = isPerfect
     ? "border-2 border-green-500 shadow-[0_0_0_1px_rgba(34,197,94,0.15)]"
     : page.status === "fail"
-      ? "border border-red-300"
+      ? "border border-red-700"
       : page.status === "warn"
-        ? "border border-yellow-300"
-        : "border border-gray-200";
+        ? "border border-yellow-700"
+        : "border border-gray-700";
 
   const checkForCanonical = (canonical: string, value: string) => {
     try {
@@ -170,21 +170,21 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
     value?: string | null;
     isWarning?: boolean;
   }) => (
-    <div className="flex flex-col text-left items-baseline justify-between py-1.5 border-b border-gray-100 last:border-0">
+    <div className="flex flex-col text-left items-baseline justify-between py-1.5 border-b border-gray-800 last:border-0">
       <div className="flex items-center gap-2 justify-between w-full">
-        <span className="text-sm text-gray-700">{label}</span>
+        <span className="text-sm text-gray-300">{label}</span>
         {isWarning ? (
-          <span className="text-sm font-medium text-yellow-600">⚠</span>
+          <span className="text-sm font-medium text-yellow-400">⚠</span>
         ) : (
-          <span className={`text-sm font-medium ${hasValue ? "text-green-600" : "text-red-600"}`}>
+          <span className={`text-sm font-medium ${hasValue ? "text-green-400" : "text-red-400"}`}>
             {hasValue ? "✓" : "✗"}
           </span>
         )}
       </div>
       {value && (
         <span
-          className={`text-xs text-gray-700 mt-1 break-words ${
-            hasValue && !isWarning ? "text-green-600" : "text-red-600 bg-red-50 p-1.5 rounded border border-red-200"
+          className={`text-xs text-gray-300 mt-1 break-words ${
+            hasValue && !isWarning ? "text-green-400" : "text-red-400 bg-red-950/50 p-1.5 rounded border border-red-800"
           }`}
         >
           {value}
@@ -196,12 +196,17 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
   return (
     <>
     <article
-      className={`bg-white rounded-md shadow-sm hover:shadow-md transition-shadow overflow-hidden cursor-pointer group ${cardBorderClass}`}
+      className={`bg-gray-900 rounded-md shadow-sm hover:shadow-md transition-shadow overflow-hidden cursor-pointer group ${cardBorderClass}`}
       onClick={() => setDetailsOpen(true)}
     >
-      <div className="relative aspect-[16/7] bg-gray-100 border-b border-gray-200">
-        <PreviewImage src={previewImage} label="OG / Twitter image" />
+      <div className="relative bg-gray-800 border-b border-gray-700">
+        {/* <PreviewImage src={previewImage} label="OG / Twitter image" /> */}
         <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+          {page.statusCode === 404 && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-600 text-white">
+              404
+            </span>
+          )}
           {isPerfect && (
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-green-600 text-white">
               All good
@@ -212,14 +217,14 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
         <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
           <span
             className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
-              ogImage ? "bg-white/90 text-gray-700 border-gray-200" : "bg-red-50/95 text-red-700 border-red-200"
+              ogImage ? "bg-gray-900/90 text-gray-300 border-gray-700" : "bg-red-950/90 text-red-300 border-red-800"
             }`}
           >
             {ogImage ? "OG image" : "No OG image"}
           </span>
           <span
-            className={`text-[10px] font-medium px-1.5 py-0.5 rounded border bg-white/90 border-gray-200 ${
-              altIssues > 0 ? "text-red-700" : "text-gray-700"
+            className={`text-[10px] font-medium px-1.5 py-0.5 rounded border bg-gray-900/90 border-gray-700 ${
+              altIssues > 0 ? "text-red-300" : "text-gray-300"
             }`}
           >
             {imageCount} img{imageCount === 1 ? "" : "s"}
@@ -234,12 +239,12 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(event) => event.stopPropagation()}
-          className="text-xs text-blue-600 hover:text-blue-700 hover:underline font-medium truncate block"
+          className="text-xs text-blue-400 hover:text-blue-300 hover:underline font-medium truncate block"
           title={page.url}
         >
           {displayPath(page.url)}
         </a>
-        <h3 className="text-sm font-semibold text-gray-900 mt-0.5 line-clamp-2" title={pageTitle}>
+        <h3 className="text-sm font-semibold text-gray-100 mt-0.5 line-clamp-2" title={pageTitle}>
           {pageTitle}
         </h3>
 
@@ -283,7 +288,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             event.stopPropagation();
             setDetailsOpen(true);
           }}
-          className="mt-3 text-xs text-gray-500 group-hover:text-gray-800 font-medium"
+          className="mt-3 text-xs text-gray-500 group-hover:text-gray-200 font-medium"
         >
           View details
         </button>
@@ -300,21 +305,21 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="page-details-title"
-            className="relative bg-white rounded-lg shadow-xl w-[92vw] max-w-7xl my-6 overflow-hidden"
+            className="relative bg-gray-900 rounded-lg shadow-xl w-[92vw] max-w-7xl my-6 overflow-hidden"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 bg-white border-b border-gray-200">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 bg-gray-900 border-b border-gray-700">
               <div className="min-w-0">
                 <a
                   href={page.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-blue-600 hover:text-blue-700 hover:underline font-medium truncate block"
+                  className="text-xs text-blue-400 hover:text-blue-300 hover:underline font-medium truncate block"
                   title={page.url}
                 >
                   {displayPath(page.url)}
                 </a>
-                <h2 id="page-details-title" className="text-lg font-semibold text-gray-900 mt-0.5 break-words">
+                <h2 id="page-details-title" className="text-lg font-semibold text-gray-100 mt-0.5 break-words">
                   {pageTitle}
                 </h2>
               </div>
@@ -323,7 +328,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                 <button
                   type="button"
                   onClick={() => setDetailsOpen(false)}
-                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                  className="p-1.5 rounded-md text-gray-500 hover:text-gray-200 hover:bg-gray-700"
                   aria-label="Close details"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -339,7 +344,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                   type="button"
                   onClick={fetchPageInsight}
                   disabled={aiLoading}
-                  className="text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-md border border-indigo-200 transition disabled:opacity-50"
+                  className="text-xs font-medium text-indigo-300 bg-indigo-950/50 hover:bg-indigo-900 px-2.5 py-1 rounded-md border border-indigo-800 transition disabled:opacity-50"
                 >
                   {aiLoading ? "Analyzing…" : "SEO analysis"}
                 </button>
@@ -351,19 +356,19 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
               </div>
 
               {aiError && (
-                <p className="mb-4 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
+                <p className="mb-4 text-xs text-red-400 bg-red-950/50 border border-red-800 rounded-md px-2 py-1.5">
                   {aiError}
                 </p>
               )}
 
               {showAi && aiInsight && (
-                <div className="mb-4 p-3 bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 rounded-md">
+                <div className="mb-4 p-3 bg-gradient-to-br from-indigo-950 to-blue-950 border border-indigo-800 rounded-md">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-semibold text-indigo-900">Page SEO outlook</h4>
+                    <h4 className="text-xs font-semibold text-indigo-200">Page SEO outlook</h4>
                     <button
                       type="button"
                       onClick={() => setShowAi(false)}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                      className="text-xs text-indigo-400 hover:text-indigo-300 font-medium"
                     >
                       Hide
                     </button>
@@ -379,18 +384,18 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <div>
                   <div className="text-[10px] text-gray-500 mb-1">Open Graph</div>
-                  <div className="aspect-[1.91/1] rounded border border-gray-200 overflow-hidden bg-gray-50">
+                  <div className="aspect-[1.91/1] rounded border border-gray-700 overflow-hidden bg-gray-800">
                     <PreviewImage src={ogImage} label="OG image" />
                   </div>
                 </div>
                 <div>
                   <div className="text-[10px] text-gray-500 mb-1">Twitter</div>
-                  <div className="aspect-[1.91/1] rounded border border-gray-200 overflow-hidden bg-gray-50">
+                  <div className="aspect-[1.91/1] rounded border border-gray-700 overflow-hidden bg-gray-800">
                     <PreviewImage src={twitterImage} label="Twitter image" />
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-gray-400">
                 {imageCount} image{imageCount === 1 ? "" : "s"} on page
                 {missingAlt > 0 ? ` · ${missingAlt} missing alt` : ""}
                 {emptyAlt > 0 ? ` · ${emptyAlt} empty alt` : ""}
@@ -407,7 +412,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                   {page.h1Texts.map((text, idx) => (
                     <div
                       key={idx}
-                      className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 min-w-0 overflow-hidden"
+                      className="text-xs text-gray-400 bg-gray-800 p-2 rounded border border-gray-800 min-w-0 overflow-hidden"
                     >
                       <span className="font-medium">H1 {idx + 1}:</span>{" "}
                       <span className="break-all break-words">{text}</span>
@@ -425,12 +430,12 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                 {(["h2", "h3", "h4", "h5", "h6"] as const).map((level) => (
                   <div
                     key={level}
-                    className={`text-center p-1.5 bg-gray-50 rounded border ${
-                      page.headingCounts[level] > 0 ? "border-green-500" : "border-red-300"
+                    className={`text-center p-1.5 bg-gray-800 rounded border ${
+                      page.headingCounts[level] > 0 ? "border-green-500" : "border-red-700"
                     }`}
                   >
-                    <div className="font-semibold text-gray-700 uppercase">{level}</div>
-                    <div className="text-gray-600">{page.headingCounts[level]}</div>
+                    <div className="font-semibold text-gray-300 uppercase">{level}</div>
+                    <div className="text-gray-400">{page.headingCounts[level]}</div>
                   </div>
                 ))}
               </div>
@@ -443,19 +448,19 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
               <div>
                 <CheckItem label="Title" hasValue={!!page.meta.title} />
                 {page.meta.title && (
-                  <div className="py-1.5 text-xs text-gray-600 bg-gray-50 p-2 rounded break-words">
+                  <div className="py-1.5 text-xs text-gray-400 bg-gray-800 p-2 rounded break-words">
                     <span className="font-medium">Title:</span> {page.meta.title}
                   </div>
                 )}
                 <CheckItem label="Description" hasValue={!!page.meta.description} />
                 {page.meta.description && (
-                  <div className="py-1.5 text-xs text-gray-600 bg-gray-50 p-2 rounded break-words">
+                  <div className="py-1.5 text-xs text-gray-400 bg-gray-800 p-2 rounded break-words">
                     <span className="font-medium">Description:</span> {page.meta.description}
                   </div>
                 )}
                 <CheckItem label="Keywords" hasValue={!!page.meta.keywords} />
                 {page.meta.keywords && (
-                  <div className="py-1.5 text-xs text-gray-600 bg-gray-50 p-2 rounded break-words">
+                  <div className="py-1.5 text-xs text-gray-400 bg-gray-800 p-2 rounded break-words">
                     <span className="font-medium">Keywords:</span> {page.meta.keywords}
                   </div>
                 )}
@@ -481,12 +486,12 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                   <div
                     className={`mb-2 text-xs px-2 py-1.5 rounded border ${
                       alternateValidation.status === "pass"
-                        ? "bg-green-50 text-green-800 border-green-200"
+                        ? "bg-green-950/50 text-green-300 border-green-800"
                         : alternateValidation.status === "warn"
-                          ? "bg-yellow-50 text-yellow-800 border-yellow-200"
+                          ? "bg-yellow-950/50 text-yellow-300 border-yellow-800"
                           : alternateValidation.status === "fail"
-                            ? "bg-red-50 text-red-800 border-red-200"
-                            : "bg-gray-50 text-gray-600 border-gray-200"
+                            ? "bg-red-950/50 text-red-300 border-red-800"
+                            : "bg-gray-800 text-gray-400 border-gray-700"
                     }`}
                   >
                     Sitemap match:{" "}
@@ -500,7 +505,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                 {alternateValidation &&
                   alternateValidation.issues.length > 0 &&
                   alternateValidation.status !== "pass" && (
-                    <ul className="mb-2 text-xs text-red-700 space-y-1 list-disc list-inside">
+                    <ul className="mb-2 text-xs text-red-300 space-y-1 list-disc list-inside">
                       {alternateValidation.issues.map((issue, i) => (
                         <li key={i}>{issue}</li>
                       ))}
@@ -511,7 +516,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                     {page.alternates.map((alt, idx) => (
                       <div
                         key={idx}
-                        className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 break-all"
+                        className="text-xs text-gray-400 bg-gray-800 p-2 rounded border border-gray-800 break-all"
                       >
                         <span className="font-medium">{alt.hreflang || "(no hreflang)"}:</span> {alt.href}
                       </div>
@@ -553,7 +558,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                     !page.twitter.title &&
                     !page.twitter.description &&
                     !page.twitter.image && (
-                      <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded border border-yellow-200">
+                      <span className="text-xs text-yellow-400 bg-yellow-950/50 px-2 py-0.5 rounded border border-yellow-800">
                         ⚠ Warning
                       </span>
                     )}
@@ -579,15 +584,15 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                 {page.jsonLd.present && (
                   <>
                     <CheckItem label="JSON-LD Valid" hasValue={page.jsonLd.valid} />
-                    <div className="py-1.5 border-b border-gray-100">
-                      <span className="text-sm text-gray-700">Count: </span>
-                      <span className="text-sm font-semibold text-gray-900">{page.jsonLd.count}</span>
+                    <div className="py-1.5 border-b border-gray-800">
+                      <span className="text-sm text-gray-300">Count: </span>
+                      <span className="text-sm font-semibold text-gray-100">{page.jsonLd.count}</span>
                     </div>
                     {page.jsonLd.types.length > 0 && (
-                      <div className="py-1.5 border-b border-gray-100">
+                      <div className="py-1.5 border-b border-gray-800">
                         <button
                           onClick={() => setJsonLdTypesExpanded(!jsonLdTypesExpanded)}
-                          className="flex items-center justify-between w-full text-left text-sm text-gray-700 hover:text-gray-900"
+                          className="flex items-center justify-between w-full text-left text-sm text-gray-300 hover:text-gray-100"
                         >
                           <span className="font-medium">Types ({page.jsonLd.types.length}):</span>
                           <span className="text-xs text-gray-500">{jsonLdTypesExpanded ? "▼" : "▶"}</span>
@@ -597,7 +602,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                             {page.jsonLd.types.map((type, idx) => (
                               <div
                                 key={idx}
-                                className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 break-words"
+                                className="text-xs text-gray-400 bg-gray-800 p-2 rounded border border-gray-800 break-words"
                               >
                                 {type}
                               </div>
@@ -607,13 +612,13 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                       </div>
                     )}
                     {page.jsonLd.errors.length > 0 && (
-                      <div className="py-1.5 border-b border-gray-100">
-                        <div className="text-xs text-red-700 font-medium mb-1">Errors:</div>
+                      <div className="py-1.5 border-b border-gray-800">
+                        <div className="text-xs text-red-300 font-medium mb-1">Errors:</div>
                         <div className="space-y-1">
                           {page.jsonLd.errors.map((error, idx) => (
                             <div
                               key={idx}
-                              className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200 break-words"
+                              className="text-xs text-red-400 bg-red-950/50 p-2 rounded border border-red-800 break-words"
                             >
                               {error}
                             </div>
@@ -625,7 +630,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                       <div className="py-1.5">
                         <button
                           onClick={() => setJsonLdExpanded(!jsonLdExpanded)}
-                          className="flex items-center justify-between w-full text-left text-sm text-gray-700 hover:text-gray-900"
+                          className="flex items-center justify-between w-full text-left text-sm text-gray-300 hover:text-gray-100"
                         >
                           <span className="font-medium">
                             View JSON-LD Content ({page.jsonLd.data.length}):
@@ -644,8 +649,8 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                               }
                               return (
                                 <div key={idx} className="text-xs">
-                                  <div className="font-medium text-gray-700 mb-1">JSON-LD #{item.index}:</div>
-                                  <pre className="bg-gray-50 border border-gray-200 rounded p-2 text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-words font-mono max-h-64 overflow-y-auto">
+                                  <div className="font-medium text-gray-300 mb-1">JSON-LD #{item.index}:</div>
+                                  <pre className="bg-gray-800 border border-gray-700 rounded p-2 text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap break-words font-mono max-h-64 overflow-y-auto">
                                     {formattedContent}
                                   </pre>
                                 </div>
@@ -661,21 +666,21 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             </div>
 
             {page.performance && (
-              <div className="mb-4 pt-3 border-t border-gray-200">
+              <div className="mb-4 pt-3 border-t border-gray-700">
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                   Performance
                 </div>
                 <div className="space-y-1 text-xs">
                   {page.performance.pageLoadTime && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Load Time:</span>
+                      <span className="text-gray-400">Load Time:</span>
                       <span
                         className={
                           page.performance.pageLoadTime.status === "pass"
-                            ? "text-green-600"
+                            ? "text-green-400"
                             : page.performance.pageLoadTime.status === "warn"
-                              ? "text-yellow-600"
-                              : "text-red-600"
+                              ? "text-yellow-400"
+                              : "text-red-400"
                         }
                       >
                         {typeof page.performance.pageLoadTime.value === "number"
@@ -686,14 +691,14 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                   )}
                   {page.performance.totalPageSize && (
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Page Size:</span>
+                      <span className="text-gray-400">Page Size:</span>
                       <span
                         className={
                           page.performance.totalPageSize.status === "pass"
-                            ? "text-green-600"
+                            ? "text-green-400"
                             : page.performance.totalPageSize.status === "warn"
-                              ? "text-yellow-600"
-                              : "text-red-600"
+                              ? "text-yellow-400"
+                              : "text-red-400"
                         }
                       >
                         {typeof page.performance.totalPageSize.value === "number"
@@ -707,29 +712,29 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             )}
 
             {page.security && (
-              <div className="mb-4 pt-3 border-t border-gray-200">
+              <div className="mb-4 pt-3 border-t border-gray-700">
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                   Security
                 </div>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">HTTPS:</span>
+                    <span className="text-gray-400">HTTPS:</span>
                     <span
                       className={
-                        page.security.sslCertificate?.status === "pass" ? "text-green-600" : "text-yellow-600"
+                        page.security.sslCertificate?.status === "pass" ? "text-green-400" : "text-yellow-400"
                       }
                     >
                       {page.security.sslCertificate?.status === "pass" ? "✓" : "⚠"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Security Headers:</span>
+                    <span className="text-gray-400">Security Headers:</span>
                     <span
                       className={
                         page.security.contentSecurityPolicy?.status === "pass" &&
                         page.security.xFrameOptions?.status === "pass"
-                          ? "text-green-600"
-                          : "text-yellow-600"
+                          ? "text-green-400"
+                          : "text-yellow-400"
                       }
                     >
                       {page.security.contentSecurityPolicy?.status === "pass" &&
@@ -743,20 +748,20 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             )}
 
             {page.accessibility && (
-              <div className="mb-4 pt-3 border-t border-gray-200">
+              <div className="mb-4 pt-3 border-t border-gray-700">
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                   Accessibility
                 </div>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Alt Text:</span>
+                    <span className="text-gray-400">Alt Text:</span>
                     <span
                       className={
                         page.accessibility.altText?.status === "pass"
-                          ? "text-green-600"
+                          ? "text-green-400"
                           : page.accessibility.altText?.status === "warn"
-                            ? "text-yellow-600"
-                            : "text-red-600"
+                            ? "text-yellow-400"
+                            : "text-red-400"
                       }
                     >
                       {page.accessibility.altText?.status === "pass"
@@ -767,10 +772,10 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Form Labels:</span>
+                    <span className="text-gray-400">Form Labels:</span>
                     <span
                       className={
-                        page.accessibility.formLabels?.status === "pass" ? "text-green-600" : "text-yellow-600"
+                        page.accessibility.formLabels?.status === "pass" ? "text-green-400" : "text-yellow-400"
                       }
                     >
                       {page.accessibility.formLabels?.status === "pass" ? "✓" : "⚠"}
@@ -781,26 +786,26 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             )}
 
             {page.analytics && (
-              <div className="mb-4 pt-3 border-t border-gray-200">
+              <div className="mb-4 pt-3 border-t border-gray-700">
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                   Analytics
                 </div>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Google Analytics:</span>
+                    <span className="text-gray-400">Google Analytics:</span>
                     <span
                       className={
-                        page.analytics.googleAnalytics?.status === "pass" ? "text-green-600" : "text-gray-400"
+                        page.analytics.googleAnalytics?.status === "pass" ? "text-green-400" : "text-gray-400"
                       }
                     >
                       {page.analytics.googleAnalytics?.status === "pass" ? "✓" : "-"}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Consent:</span>
+                    <span className="text-gray-400">Consent:</span>
                     <span
                       className={
-                        page.analytics.trackingConsent?.status === "pass" ? "text-green-600" : "text-yellow-600"
+                        page.analytics.trackingConsent?.status === "pass" ? "text-green-400" : "text-yellow-400"
                       }
                     >
                       {page.analytics.trackingConsent?.status === "pass" ? "✓" : "⚠"}
@@ -811,13 +816,13 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
             )}
 
             {page.issues.length > 0 && (
-              <div className="pt-3 border-t border-gray-200">
+              <div className="pt-3 border-t border-gray-700">
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
                   Issues ({page.issues.length})
                 </div>
                 <ul className="space-y-1.5">
                   {page.issues.map((issue, index) => (
-                    <li key={index} className="text-xs text-gray-600 flex items-start gap-2">
+                    <li key={index} className="text-xs text-gray-400 flex items-start gap-2">
                       <span className="text-red-500 mt-0.5">•</span>
                       <span>{issue}</span>
                     </li>

@@ -39,15 +39,15 @@ export default function AiInsightsPanel({ pages }: AiInsightsPanelProps) {
   };
 
   return (
-    <div className="mb-6 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg overflow-hidden">
+    <div className="mb-6 bg-gradient-to-r from-indigo-950 to-blue-950 border border-indigo-800 rounded-lg overflow-hidden">
       <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <span className="text-indigo-600 text-lg" aria-hidden>
+          <span className="text-indigo-400 text-lg" aria-hidden>
             ✦
           </span>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">SEO performance analysis</h2>
-            <p className="text-xs text-gray-600">
+            <h2 className="text-sm font-semibold text-gray-100">SEO performance analysis</h2>
+            <p className="text-xs text-gray-400">
               Consultant-style report: critical issues, growth opportunities, and prioritized action plan
             </p>
           </div>
@@ -62,14 +62,14 @@ export default function AiInsightsPanel({ pages }: AiInsightsPanelProps) {
         </button>
       </div>
 
-      {error && <p className="px-4 pb-3 text-sm text-red-700">{error}</p>}
+      {error && <p className="px-4 pb-3 text-sm text-red-300">{error}</p>}
 
       {insights && (
-        <div className="border-t border-indigo-200 bg-white/80">
+        <div className="border-t border-indigo-800 bg-gray-900/80">
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className="w-full px-4 py-2 text-left text-xs text-gray-500 hover:bg-white/50 flex items-center justify-between"
+            className="w-full px-4 py-2 text-left text-xs text-gray-500 hover:bg-gray-800/60 flex items-center justify-between"
           >
             <span>{expanded ? "Hide analysis" : "Show analysis"}</span>
             <span>{expanded ? "▼" : "▶"}</span>

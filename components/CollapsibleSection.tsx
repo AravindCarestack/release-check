@@ -36,11 +36,11 @@ export default function CollapsibleSection({
   };
 
   return (
-    <div className={`border border-gray-100 rounded-md overflow-hidden ${className}`}>
+    <div className={`border border-gray-800 rounded-md overflow-hidden ${className}`}>
       <button
         type="button"
         onClick={handleToggle}
-        className="flex items-center justify-between w-full px-3 py-2 text-left hover:bg-gray-50 transition"
+        className="flex items-center justify-between w-full px-3 py-2 text-left hover:bg-gray-800 transition"
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <svg
@@ -55,7 +55,7 @@ export default function CollapsibleSection({
             />
           </svg>
           <div className="min-w-0">
-            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
               {title}
             </span>
             {subtitle && (
@@ -65,7 +65,7 @@ export default function CollapsibleSection({
         </div>
         {badge && <div className="shrink-0 ml-2">{badge}</div>}
       </button>
-      {open && <div className="px-3 pb-3 border-t border-gray-100">{children}</div>}
+      {open && <div className="px-3 pb-3 border-t border-gray-800">{children}</div>}
     </div>
   );
 }

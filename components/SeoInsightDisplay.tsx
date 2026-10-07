@@ -32,7 +32,7 @@ function InsightList({
       <h4 className={`text-xs font-semibold uppercase tracking-wide mb-1.5 ${titleClass}`}>
         {title}
       </h4>
-      <ul className="list-disc list-inside space-y-1 text-gray-700">
+      <ul className="list-disc list-inside space-y-1 text-gray-300">
         {shown.map((item, i) => (
           <li key={i}>{item}</li>
         ))}
@@ -64,28 +64,28 @@ export default function SeoInsightDisplay({
       </div>
 
       <div>
-        <h4 className={`font-semibold text-gray-900 mb-1 ${compact ? "text-xs" : "text-sm"}`}>
+        <h4 className={`font-semibold text-gray-100 mb-1 ${compact ? "text-xs" : "text-sm"}`}>
           Executive summary
         </h4>
-        <p className="text-gray-700 leading-relaxed">{insights.summary}</p>
+        <p className="text-gray-300 leading-relaxed">{insights.summary}</p>
       </div>
 
       {insights.seoOutlook && (
-        <div className="rounded-md border border-indigo-100 bg-indigo-50/50 px-3 py-2">
-          <h4 className="text-xs font-semibold text-indigo-900 mb-1">SEO outlook</h4>
-          <p className="text-gray-700 leading-relaxed">{insights.seoOutlook}</p>
+        <div className="rounded-md border border-indigo-800 bg-indigo-950/50 px-3 py-2">
+          <h4 className="text-xs font-semibold text-indigo-200 mb-1">SEO outlook</h4>
+          <p className="text-gray-300 leading-relaxed">{insights.seoOutlook}</p>
         </div>
       )}
 
       {!compact && (insights.estimatedOrganicImpact || insights.estimatedRankingRisk) && (
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md border border-emerald-100 bg-emerald-50/40 px-3 py-2">
-            <h4 className="text-xs font-semibold text-emerald-900 mb-1">Estimated organic impact</h4>
-            <p className="text-gray-700 text-xs leading-relaxed">{insights.estimatedOrganicImpact}</p>
+          <div className="rounded-md border border-emerald-800 bg-emerald-950/40 px-3 py-2">
+            <h4 className="text-xs font-semibold text-emerald-200 mb-1">Estimated organic impact</h4>
+            <p className="text-gray-300 text-xs leading-relaxed">{insights.estimatedOrganicImpact}</p>
           </div>
-          <div className="rounded-md border border-amber-100 bg-amber-50/40 px-3 py-2">
-            <h4 className="text-xs font-semibold text-amber-900 mb-1">Estimated ranking risk</h4>
-            <p className="text-gray-700 text-xs leading-relaxed">{insights.estimatedRankingRisk}</p>
+          <div className="rounded-md border border-amber-800 bg-amber-950/40 px-3 py-2">
+            <h4 className="text-xs font-semibold text-amber-200 mb-1">Estimated ranking risk</h4>
+            <p className="text-gray-300 text-xs leading-relaxed">{insights.estimatedRankingRisk}</p>
           </div>
         </div>
       )}
@@ -93,20 +93,20 @@ export default function SeoInsightDisplay({
       <InsightList
         title="Critical issues"
         items={insights.criticalIssues}
-        titleClass="text-red-800"
+        titleClass="text-red-300"
         limit={compact ? 2 : undefined}
       />
 
       <InsightList
         title="High-impact opportunities"
         items={insights.highImpactOpportunities}
-        titleClass="text-blue-800"
+        titleClass="text-blue-300"
         limit={compact ? 2 : undefined}
       />
 
       {actions.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide mb-2">
+          <h4 className="text-xs font-semibold text-gray-100 uppercase tracking-wide mb-2">
             Priority action plan
           </h4>
           <div className="space-y-2">
@@ -115,7 +115,7 @@ export default function SeoInsightDisplay({
               return (
                 <div
                   key={i}
-                  className="rounded-md border border-gray-200 bg-white px-3 py-2.5 shadow-sm"
+                  className="rounded-md border border-gray-700 bg-gray-900 px-3 py-2.5 shadow-sm"
                 >
                   <div className="flex flex-wrap items-center gap-2 mb-1.5">
                     <span
@@ -127,21 +127,21 @@ export default function SeoInsightDisplay({
                       {action.category}
                     </span>
                   </div>
-                  <p className="font-medium text-gray-900">{action.issue}</p>
+                  <p className="font-medium text-gray-100">{action.issue}</p>
                   {!compact && (
                     <>
-                      <p className="text-xs text-gray-600 mt-1">
-                        <span className="font-medium text-gray-700">Why it matters:</span>{" "}
+                      <p className="text-xs text-gray-400 mt-1">
+                        <span className="font-medium text-gray-300">Why it matters:</span>{" "}
                         {action.impact}
                       </p>
-                      <p className="text-xs text-indigo-800 mt-1">
+                      <p className="text-xs text-indigo-300 mt-1">
                         <span className="font-medium">Recommendation:</span>{" "}
                         {action.recommendation}
                       </p>
                     </>
                   )}
                   {compact && (
-                    <p className="text-xs text-indigo-800 mt-1">{action.recommendation}</p>
+                    <p className="text-xs text-indigo-300 mt-1">{action.recommendation}</p>
                   )}
                 </div>
               );
@@ -158,20 +158,20 @@ export default function SeoInsightDisplay({
       <InsightList
         title="What's wrong"
         items={insights.whatsWrong}
-        titleClass="text-red-700"
+        titleClass="text-red-300"
         limit={compact ? 3 : undefined}
       />
 
       <InsightList
         title="What's working"
         items={insights.whatsWorking}
-        titleClass="text-green-700"
+        titleClass="text-green-300"
       />
 
       <InsightList
         title="SEO best practices"
         items={insights.bestPractices}
-        titleClass="text-blue-700"
+        titleClass="text-blue-300"
         limit={compact ? 2 : undefined}
       />
     </div>

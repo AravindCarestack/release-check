@@ -62,6 +62,8 @@ export interface PageReport {
   };
   issues: string[];
   status: "pass" | "warn" | "fail";
+  /** HTTP status from the crawl. Null when the page was not fetched in this run. */
+  statusCode: number | null;
 }
 
 /**
@@ -257,7 +259,8 @@ export async function analyzePage(
   html: string, 
   url: string, 
   baseUrl?: URL,
-  headers?: Record<string, string | string[] | undefined>
+  headers?: Record<string, string | string[] | undefined>,
+  statusCode?: number | null
 ): Promise<PageReport> {
   const $ = cheerio.load(html);
   const issues: string[] = [];
@@ -305,6 +308,9 @@ export async function analyzePage(
   }
   if (!canonical) {
     issues.push("Missing canonical URL");
+  }
+  if (statusCode === 404) {
+    issues.push("Page returns HTTP 404");
   }
 
   let imageCount = 0;
@@ -374,12 +380,12 @@ export async function analyzePage(
   );
   
   let status: "pass" | "warn" | "fail";
-  if (criticalIssues.length === 0) {
-    status = "pass";
-  } else if (criticalIssues.length <= 2) {
-    status = "warn";
-  } else {
+  if (statusCode === 404 || criticalIssues.length > 2) {
     status = "fail";
+  } else if (criticalIssues.length === 0) {
+    status = "pass";
+  } else {
+    status = "warn";
   }
 
   // Perform additional checks if headers are available
@@ -460,5 +466,6 @@ export async function analyzePage(
     },
     issues,
     status,
+    statusCode: statusCode ?? null,
   };
 }

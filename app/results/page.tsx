@@ -198,13 +198,13 @@ function ResultsContent() {
     if (crawl) {
       // Show terminal for crawl mode
       return (
-        <div className="min-h-screen bg-gray-50 py-8">
+        <div className="min-h-screen bg-gray-950 py-8">
           <div className="container mx-auto px-6">
             <div className="max-w-7xl mx-auto">
               <div className="mb-6">
                 <button
                   onClick={() => router.push("/")}
-                  className="text-blue-600 hover:text-blue-700 mb-4 flex items-center text-sm font-medium"
+                  className="text-blue-400 hover:text-blue-300 mb-4 flex items-center text-sm font-medium"
                 >
                   <svg
                     className="w-4 h-4 mr-2"
@@ -221,10 +221,10 @@ function ResultsContent() {
                   </svg>
                   Back to Home
                 </button>
-                <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+                <h1 className="text-2xl font-semibold text-gray-100 mb-2">
                   Crawling Website
                 </h1>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-400">
                   Real-time crawling progress
                 </p>
               </div>
@@ -237,10 +237,10 @@ function ResultsContent() {
     
     // Regular loading for single page
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <svg
-            className="animate-spin h-10 w-10 text-blue-600 mx-auto mb-4"
+            className="animate-spin h-10 w-10 text-blue-400 mx-auto mb-4"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -259,7 +259,7 @@ function ResultsContent() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p className="text-base text-gray-700 font-medium">
+          <p className="text-base text-gray-300 font-medium">
             Analyzing website...
           </p>
           <p className="text-sm text-gray-500 mt-2">
@@ -272,13 +272,13 @@ function ResultsContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="max-w-md mx-auto bg-white border border-gray-200 rounded-md shadow-sm p-8 text-center">
-          <div className="text-red-600 text-3xl mb-4 font-bold">⚠</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-3">
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="max-w-md mx-auto bg-gray-900 border border-gray-700 rounded-md shadow-sm p-8 text-center">
+          <div className="text-red-400 text-3xl mb-4 font-bold">⚠</div>
+          <h2 className="text-xl font-semibold text-gray-100 mb-3">
             Analysis Failed
           </h2>
-          <p className="text-gray-600 mb-6 text-sm">{error}</p>
+          <p className="text-gray-400 mb-6 text-sm">{error}</p>
           <button
             onClick={() => router.push("/")}
             className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md transition text-sm"
@@ -293,14 +293,14 @@ function ResultsContent() {
   // Multi-page crawl results
   if (crawlResult) {
     return (
-      <div className="min-h-screen bg-white py-8">
+      <div className="min-h-screen bg-gray-950 py-8">
         <div className="container mx-auto px-6">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
               <button
                 onClick={() => router.push("/")}
-                className="text-blue-600 hover:text-blue-700 mb-4 flex items-center text-sm font-medium"
+                className="text-blue-400 hover:text-blue-300 mb-4 flex items-center text-sm font-medium"
               >
                 <svg
                   className="w-4 h-4 mr-2"
@@ -318,7 +318,7 @@ function ResultsContent() {
                 Back to Home
               </button>
               <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
-                <h1 className="text-2xl font-semibold text-gray-900">
+                <h1 className="text-2xl font-semibold text-gray-100">
                   SEO Analysis Results
                 </h1>
                 <div className="flex gap-2">
@@ -357,18 +357,18 @@ function ResultsContent() {
                 </div>
               </div>
               <div className="space-y-2">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-400">
                   Analyzed {crawlResult.totalPages} page{crawlResult.totalPages !== 1 ? "s" : ""} from the website
                 </p>
                 {localeInfo && localeInfo.hasMultiple && (
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-gray-700">
+                    <span className="text-sm font-medium text-gray-300">
                       Regions detected:
                     </span>
                     {localeInfo.groups.map((group) => (
                       <span
                         key={group.locale.locale}
-                        className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md font-medium border border-blue-200"
+                        className="text-xs bg-blue-950/50 text-blue-300 px-2.5 py-1 rounded-md font-medium border border-blue-800"
                       >
                         {group.locale.displayName} ({group.pages.length})
                       </span>
@@ -378,7 +378,7 @@ function ResultsContent() {
                 {crawlResult.sitemap && (
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-sm font-medium ${crawlResult.sitemap.present ? "text-green-600" : "text-red-600"}`}>
+                      <span className={`text-sm font-medium ${crawlResult.sitemap.present ? "text-green-400" : "text-red-400"}`}>
                         {crawlResult.sitemap.present ? "✓" : "✗"}{" "}
                         {crawlResult.crawlStatistics?.sitemapIsIndex
                           ? `Sitemap index: Found (${crawlResult.crawlStatistics.childSitemaps?.length ?? 0} child sitemaps, ${crawlResult.crawlStatistics.sitemapUrlCount ?? 0} URLs)`
@@ -389,7 +389,7 @@ function ResultsContent() {
                           href={crawlResult.sitemap.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
+                          className="text-xs text-blue-400 hover:underline"
                         >
                           {crawlResult.sitemap.url}
                         </a>
@@ -404,7 +404,7 @@ function ResultsContent() {
                                 href={child}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:underline"
+                                className="text-xs text-blue-400 hover:underline"
                               >
                                 {child}
                               </a>
@@ -420,20 +420,20 @@ function ResultsContent() {
             {/* Export PDF Modal */}
             {showPDFModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-                <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Export PDF Report</h3>
-                  <p className="text-sm text-gray-600 mb-4">
+                <div className="bg-gray-900 rounded-lg shadow-xl max-w-md w-full p-6">
+                  <h3 className="text-lg font-semibold text-gray-100 mb-4">Export PDF Report</h3>
+                  <p className="text-sm text-gray-400 mb-4">
                     Choose which region to include in the report. The PDF will use a professional layout with clear sections and alignment.
                   </p>
                   <div className="mb-4">
-                    <label htmlFor="pdf-region" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="pdf-region" className="block text-sm font-medium text-gray-300 mb-2">
                       Region / Country
                     </label>
                     <select
                       id="pdf-region"
                       value={pdfExportLocale}
                       onChange={(e) => setPdfExportLocale(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                      className="w-full px-3 py-2 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                     >
                       <option value="all">
                         All Countries ({crawlResult?.pages?.length ?? 0} pages)
@@ -450,7 +450,7 @@ function ResultsContent() {
                       type="button"
                       onClick={() => setShowPDFModal(false)}
                       disabled={exportingPDF}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition disabled:opacity-50"
+                      className="px-4 py-2 text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-md transition disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -479,33 +479,33 @@ function ResultsContent() {
 
             {/* Robots.txt Display */}
             {crawlResult.robotsTxt && (
-              <div className="mb-6 bg-white rounded-md border border-gray-200 shadow-sm p-5">
+              <div className="mb-6 bg-gray-900 rounded-md border border-gray-700 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold text-gray-900">
+                  <h2 className="text-lg font-semibold text-gray-100">
                     Robots.txt
                   </h2>
                   <span className={`text-sm font-medium px-3 py-1 rounded-md ${
-                    crawlResult.robotsTxt.present 
-                      ? "bg-green-100 text-green-700" 
-                      : "bg-red-100 text-red-700"
+                    crawlResult.robotsTxt.present
+                      ? "bg-green-900/70 text-green-300"
+                      : "bg-red-900/70 text-red-300"
                   }`}>
                     {crawlResult.robotsTxt.present ? "✓ Present" : "✗ Not Found"}
                   </span>
                 </div>
                 {crawlResult.robotsTxt.present && (
-                  <div className="mb-3 flex items-center justify-between rounded-md border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="mb-3 flex items-center justify-between rounded-md border border-gray-700 bg-gray-800 px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-gray-100">
                         Disallow: /*?*
                       </p>
-                      <p className="text-xs text-gray-600 mt-1">
+                      <p className="text-xs text-gray-400 mt-1">
                         Blocks URLs with query strings (e.g. /products?sort=price)
                       </p>
                     </div>
                     <span className={`text-sm font-medium px-3 py-1 rounded-md ${
                       crawlResult.robotsTxt.disallowQueryParams
-                        ? "bg-green-100 text-green-700"
-                        : "bg-yellow-100 text-yellow-700"
+                        ? "bg-green-900/70 text-green-300"
+                        : "bg-yellow-900/70 text-yellow-300"
                     }`}>
                       {crawlResult.robotsTxt.disallowQueryParams ? "✓ Present" : "⚠ Missing"}
                     </span>
@@ -513,7 +513,7 @@ function ResultsContent() {
                 )}
                 {crawlResult.robotsTxt.present && crawlResult.robotsTxt.content && (
                   <div className="mt-3">
-                    <pre className="bg-gray-50 border border-gray-200 rounded-md p-4 text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-words font-mono">
+                    <pre className="bg-gray-800 border border-gray-700 rounded-md p-4 text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap break-words font-mono">
                       {crawlResult.robotsTxt.content}
                     </pre>
                   </div>
@@ -549,10 +549,10 @@ export default function ResultsPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
           <div className="text-center">
             <svg
-              className="animate-spin h-10 w-10 text-blue-600 mx-auto mb-4"
+              className="animate-spin h-10 w-10 text-blue-400 mx-auto mb-4"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -571,7 +571,7 @@ export default function ResultsPage() {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            <p className="text-base text-gray-700 font-medium">Loading...</p>
+            <p className="text-base text-gray-300 font-medium">Loading...</p>
           </div>
         </div>
       }

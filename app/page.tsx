@@ -50,24 +50,24 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-950">
       <div className="container mx-auto px-6 py-12">
         <div className="max-w-3xl mx-auto">
           <div className="mb-10">
-            <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+            <h1 className="text-3xl font-semibold text-gray-100 mb-2">
               SEO Website Validator
             </h1>
-            <p className="text-base text-gray-600">
+            <p className="text-base text-gray-400">
               Comprehensive SEO and production readiness analysis
             </p>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-md shadow-sm p-8">
+          <div className="bg-gray-900 border border-gray-700 rounded-md shadow-sm p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <label
                   htmlFor="url"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+                  className="block text-sm font-medium text-gray-300 mb-2"
                 >
                   Website URL
                 </label>
@@ -80,11 +80,11 @@ export default function Home() {
                     setError("");
                   }}
                   placeholder="https://example.com"
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm"
+                  className="w-full px-4 py-2.5 border border-gray-600 rounded-md bg-gray-950 text-gray-100 placeholder:text-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-sm"
                   disabled={isLoading}
                 />
                 {error && (
-                  <p className="mt-2 text-sm text-red-600">{error}</p>
+                  <p className="mt-2 text-sm text-red-400">{error}</p>
                 )}
                 <p className="mt-2 text-xs text-gray-500">
                   All internal pages will be crawled and analyzed automatically
@@ -94,7 +94,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-2.5 px-6 rounded-md transition flex items-center justify-center text-sm"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-medium py-2.5 px-6 rounded-md transition flex items-center justify-center text-sm"
               >
                 {isLoading ? (
                   <>
@@ -127,7 +127,7 @@ export default function Home() {
             </form>
           </div>
 
-          <div className="mt-8 text-sm text-gray-600">
+          <div className="mt-8 text-sm text-gray-400">
             <p className="mb-3 font-medium">Analysis includes:</p>
             <ul className="space-y-1.5">
               <li className="flex items-center gap-2">

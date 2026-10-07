@@ -59,6 +59,7 @@ function summarizePageSignals(page: PageReport) {
   return {
     url: page.url,
     auditStatus: page.status,
+    httpStatus: page.statusCode,
     issueCount: page.issues.length,
     detectedIssues: page.issues,
     indexability: {
@@ -251,6 +252,34 @@ export function buildCrawlSummary(pages: PageReport[]): string {
   };
 
   return JSON.stringify(payload);
+}
+
+export function buildCrawlChatContext(pages: PageReport[]): string {
+  const auditSummary = JSON.parse(buildCrawlSummary(pages));
+  const pageEvidence = pages.map((page) => ({
+    url: page.url,
+    httpStatus: page.statusCode,
+    auditStatus: page.status,
+    issues: page.issues,
+    title: page.meta.title,
+    description: page.meta.description,
+    canonical: page.meta.canonical,
+    robots: page.meta.robots,
+    h1Count: page.h1Count,
+    h1Texts: page.h1Texts.slice(0, 2),
+    jsonLd: {
+      present: page.jsonLd.present,
+      valid: page.jsonLd.valid,
+      types: page.jsonLd.types,
+    },
+    openGraphImage: page.og.image,
+    imageAltIssues:
+      (page.images?.missingAlt ?? 0) + (page.images?.emptyAlt ?? 0),
+    hreflangCount: page.alternates?.length ?? 0,
+    loadTimeMs: toNumericMetric(page.performance?.pageLoadTime?.value),
+  }));
+
+  return JSON.stringify({ auditSummary, pageEvidence });
 }
 
 export function buildPageSummary(page: PageReport): string {

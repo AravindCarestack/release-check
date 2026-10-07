@@ -35,15 +35,15 @@ export default function ResultsDisplay({ result, url: propUrl }: ResultsDisplayP
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-green-600";
-    if (score >= 60) return "text-yellow-600";
-    return "text-red-600";
+    if (score >= 80) return "text-green-400";
+    if (score >= 60) return "text-yellow-400";
+    return "text-red-400";
   };
 
   const getScoreBgColor = (score: number) => {
-    if (score >= 80) return "bg-green-50 border-green-200";
-    if (score >= 60) return "bg-yellow-50 border-yellow-200";
-    return "bg-red-50 border-red-200";
+    if (score >= 80) return "bg-green-950/50 border-green-800";
+    if (score >= 60) return "bg-yellow-950/50 border-yellow-800";
+    return "bg-red-950/50 border-red-800";
   };
 
   const handleExportPDF = async () => {
@@ -73,14 +73,14 @@ export default function ResultsDisplay({ result, url: propUrl }: ResultsDisplayP
   };
 
   return (
-    <div className="min-h-screen bg-white py-8">
+    <div className="min-h-screen bg-gray-950 py-8">
       <div className="container mx-auto px-6">
         <div className="max-w-5xl mx-auto">
           {/* Header */}
           <div className="mb-8">
             <button
               onClick={() => router.push("/")}
-              className="text-blue-600 hover:text-blue-700 mb-4 flex items-center text-sm font-medium"
+              className="text-blue-400 hover:text-blue-300 mb-4 flex items-center text-sm font-medium"
             >
               <svg
                 className="w-4 h-4 mr-2"
@@ -98,7 +98,7 @@ export default function ResultsDisplay({ result, url: propUrl }: ResultsDisplayP
               Back to Home
             </button>
             <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
-              <h1 className="text-2xl font-semibold text-gray-900">
+              <h1 className="text-2xl font-semibold text-gray-100">
                 SEO Analysis Results
               </h1>
               <div className="flex gap-2">
@@ -158,7 +158,7 @@ export default function ResultsDisplay({ result, url: propUrl }: ResultsDisplayP
           >
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                <h2 className="text-lg font-semibold text-gray-100 mb-2">
                   Overall SEO Score
                 </h2>
                 <div className="flex items-baseline gap-2">
@@ -167,7 +167,7 @@ export default function ResultsDisplay({ result, url: propUrl }: ResultsDisplayP
                   >
                     {result.score}
                   </span>
-                  <span className="text-gray-600 text-lg">/ 100</span>
+                  <span className="text-gray-400 text-lg">/ 100</span>
                 </div>
               </div>
               <div className="flex gap-3 flex-wrap">
@@ -191,32 +191,32 @@ export default function ResultsDisplay({ result, url: propUrl }: ResultsDisplayP
           </div>
 
           {/* Summary */}
-          <div className="bg-white border border-gray-200 rounded-md shadow-sm p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-md shadow-sm p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-100 mb-4">
               Summary
             </h3>
             <div className="grid md:grid-cols-3 gap-4">
-              <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                <div className="text-2xl font-bold text-green-700">
+              <div className="p-4 bg-green-950/50 border border-green-800 rounded-md">
+                <div className="text-2xl font-bold text-green-300">
                   {result.passed.length}
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-400">
                   Checks Passed
                 </div>
               </div>
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-                <div className="text-2xl font-bold text-yellow-700">
+              <div className="p-4 bg-yellow-950/50 border border-yellow-800 rounded-md">
+                <div className="text-2xl font-bold text-yellow-300">
                   {result.warnings.length}
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-400">
                   Warnings
                 </div>
               </div>
-              <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-                <div className="text-2xl font-bold text-red-700">
+              <div className="p-4 bg-red-950/50 border border-red-800 rounded-md">
+                <div className="text-2xl font-bold text-red-300">
                   {result.failed.length}
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-400">
                   Failed Checks
                 </div>
               </div>
