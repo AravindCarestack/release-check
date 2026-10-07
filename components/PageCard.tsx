@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import StatusBadge from "./StatusBadge";
 import SeoInsightDisplay from "./SeoInsightDisplay";
 import type { PageReport } from "@/lib/page-analyzer";
+import type { CheckResult } from "@/app/types";
 import type { AlternateValidationResult } from "@/lib/alternate-validator";
 import type { AiInsightsResult } from "@/lib/ai-insights";
 import { buildPageSummary } from "@/lib/ai-insights-summary";
@@ -21,6 +22,38 @@ function resolveAssetUrl(src: string | null | undefined, pageUrl: string): strin
   } catch {
     return src.trim();
   }
+}
+
+function formatPerformanceValue(check: CheckResult, format: "score" | "duration" | "cls" | "megabytes" | "text"): string {
+  const value = check.value;
+  if (format === "score" && typeof value === "number") return String(Math.round(value));
+  if (format === "duration" && typeof value === "number") {
+    return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${Math.round(value)}ms`;
+  }
+  if (format === "cls" && typeof value === "number") return value.toFixed(3);
+  if (format === "megabytes" && typeof value === "number") return `${value.toFixed(2)}MB`;
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  return "—";
+}
+
+function PerformanceMetric({
+  check,
+  format,
+}: {
+  check?: CheckResult;
+  format: "score" | "duration" | "cls" | "megabytes" | "text";
+}) {
+  if (!check) return null;
+  const label = check.label || (format === "megabytes" ? "Page size" : "Load time");
+  const tone =
+    check.status === "pass" ? "text-green-400" : check.status === "warn" ? "text-yellow-400" : "text-red-400";
+
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-gray-400">{label}:</span>
+      <span className={tone}>{formatPerformanceValue(check, format)}</span>
+    </div>
+  );
 }
 
 function displayPath(url: string): string {
@@ -671,42 +704,12 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                   Performance
                 </div>
                 <div className="space-y-1 text-xs">
-                  {page.performance.pageLoadTime && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Load Time:</span>
-                      <span
-                        className={
-                          page.performance.pageLoadTime.status === "pass"
-                            ? "text-green-400"
-                            : page.performance.pageLoadTime.status === "warn"
-                              ? "text-yellow-400"
-                              : "text-red-400"
-                        }
-                      >
-                        {typeof page.performance.pageLoadTime.value === "number"
-                          ? `${page.performance.pageLoadTime.value}ms`
-                          : "-"}
-                      </span>
-                    </div>
-                  )}
-                  {page.performance.totalPageSize && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Page Size:</span>
-                      <span
-                        className={
-                          page.performance.totalPageSize.status === "pass"
-                            ? "text-green-400"
-                            : page.performance.totalPageSize.status === "warn"
-                              ? "text-yellow-400"
-                              : "text-red-400"
-                        }
-                      >
-                        {typeof page.performance.totalPageSize.value === "number"
-                          ? `${page.performance.totalPageSize.value.toFixed(2)}MB`
-                          : "-"}
-                      </span>
-                    </div>
-                  )}
+                  <PerformanceMetric check={page.performance.lighthouseScore} format="score" />
+                  <PerformanceMetric check={page.performance.pageLoadTime} format="duration" />
+                  <PerformanceMetric check={page.performance.cumulativeLayoutShift} format="cls" />
+                  <PerformanceMetric check={page.performance.interactionToNextPaint} format="duration" />
+                  <PerformanceMetric check={page.performance.fieldExperience} format="text" />
+                  <PerformanceMetric check={page.performance.totalPageSize} format="megabytes" />
                 </div>
               </div>
             )}

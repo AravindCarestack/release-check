@@ -5,6 +5,7 @@ import { looksLikeSitemapUrl } from "@/lib/sitemap-parser";
 import { analyzePage } from "@/lib/page-analyzer";
 import type { PageReport } from "@/lib/page-analyzer";
 import { hasDisallowQueryParams } from "@/lib/robots-parser";
+import { measurePageSpeed, toPageSpeedSummary, urlsMatch, type PageSpeedAttempt } from "@/lib/pagespeed";
 
 // Increase timeout for browser-based crawling (can take longer)
 export const maxDuration = 300; // 5 minutes (Vercel limit)
@@ -18,7 +19,9 @@ const MAX_CONCURRENT_ANALYSIS = 5;
 async function analyzePagesConcurrently(
   pages: Array<{ url: string; html: string; statusCode?: number | null }>,
   baseUrl: URL,
-  maxConcurrent: number = MAX_CONCURRENT_ANALYSIS
+  maxConcurrent: number = MAX_CONCURRENT_ANALYSIS,
+  pageSpeed?: PageSpeedAttempt,
+  pageSpeedUrl?: string
 ): Promise<PageReport[]> {
   const results: PageReport[] = [];
   
@@ -28,7 +31,9 @@ async function analyzePagesConcurrently(
     const batchResults = await Promise.all(
       batch.map(async (page) => {
         try {
-          return await analyzePage(page.html, page.url, baseUrl, undefined, page.statusCode);
+          const usePageSpeed =
+            pageSpeed && pageSpeedUrl && urlsMatch(page.url, pageSpeedUrl) ? pageSpeed : undefined;
+          return await analyzePage(page.html, page.url, baseUrl, undefined, page.statusCode, usePageSpeed);
         } catch (error) {
           // Return a failed report if analysis fails
           return {
@@ -138,11 +143,14 @@ export async function GET(request: NextRequest) {
 
       // Crawl the website using sitemap-first approach
       // WHY: Uses sitemap URLs directly via HTTP - most reliable for production sites
-      const crawlResult = await crawlWebsite(normalizedUrl, {
-        maxPages: maxPages, // Configurable via query parameter, default 200
-        timeout: 15000, // 15 seconds per page
-        debug: true, // Enable debug logging to diagnose issues
-      });
+      const [crawlResult, pageSpeed] = await Promise.all([
+        crawlWebsite(normalizedUrl, {
+          maxPages: maxPages, // Configurable via query parameter, default 200
+          timeout: 15000, // 15 seconds per page
+          debug: true, // Enable debug logging to diagnose issues
+        }),
+        measurePageSpeed(normalizedUrl),
+      ]);
 
       const crawledPages = crawlResult.pages;
       const crawlStatistics = crawlResult.statistics;
@@ -163,7 +171,13 @@ export async function GET(request: NextRequest) {
         statusCode: page.statusCode,
       }));
 
-      const pageReports = await analyzePagesConcurrently(pagesToAnalyze, baseUrl);
+      const pageReports = await analyzePagesConcurrently(
+        pagesToAnalyze,
+        baseUrl,
+        MAX_CONCURRENT_ANALYSIS,
+        pageSpeed,
+        normalizedUrl
+      );
       
       console.log(`[API] Analyzed ${pageReports.length} pages`);
 
@@ -204,6 +218,7 @@ export async function GET(request: NextRequest) {
           crawlErrors: crawlStatistics.crawlErrors,
         },
         pages: pagesWithSitemap,
+        pageSpeed: toPageSpeedSummary(pageSpeed, normalizedUrl),
       });
     }
 

@@ -1,8 +1,11 @@
+import type { PageSpeedSummary } from "@/lib/pagespeed";
+
 export interface SEOAnalysisResult {
   score: number;
   passed: string[];
   warnings: string[];
   failed: string[];
+  pageSpeed?: PageSpeedSummary;
   details: {
     metaTags: MetaTagCheck;
     openGraph: OpenGraphCheck;
@@ -74,6 +77,8 @@ export interface TechnicalCheck {
 export interface CheckResult {
   status: "pass" | "warn" | "fail";
   message: string;
+  /** Overrides the default label derived from the check key. */
+  label?: string;
   value?: string | number | boolean;
   recommendation?: string;
 }
@@ -87,6 +92,13 @@ export interface PerformanceCheck {
   renderBlockingResources: CheckResult;
   fontLoading: CheckResult;
   thirdPartyScripts: CheckResult;
+  /** Present when the PageSpeed Insights API returned a result for this URL. */
+  lighthouseScore?: CheckResult;
+  cumulativeLayoutShift?: CheckResult;
+  interactionToNextPaint?: CheckResult;
+  totalBlockingTime?: CheckResult;
+  fieldExperience?: CheckResult;
+  pageSpeed?: CheckResult;
 }
 
 export interface SecurityCheck {

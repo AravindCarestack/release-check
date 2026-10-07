@@ -99,7 +99,7 @@ export default function CheckSection({
         <div key={key} className="p-4 border-b border-gray-700 last:border-0">
           <div className="flex items-start justify-between mb-2">
             <span className="font-medium text-gray-100 capitalize">
-              {key.replace(/([A-Z])/g, " $1").trim()}
+              {check.label || key.replace(/([A-Z])/g, " $1").trim()}
             </span>
             <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(check.status)}`}>
               {getStatusIcon(check.status)} {check.status.toUpperCase()}

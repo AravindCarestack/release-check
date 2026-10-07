@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import type { PerformanceCheck, CheckResult } from "@/app/types";
+import type { PageSpeedAttempt, PageSpeedMeasurement } from "@/lib/pagespeed";
 
 const TIMEOUT = 30000;
 
@@ -9,45 +10,289 @@ export async function analyzePerformance(
   html: string,
   passed: string[],
   warnings: string[],
-  failed: string[]
+  failed: string[],
+  options?: { pageSpeed?: PageSpeedAttempt }
 ): Promise<PerformanceCheck> {
   const $ = cheerio.load(html);
   const baseUrl = new URL(url);
+  const pageSpeed = options?.pageSpeed;
+  const lab = pageSpeed?.ok ? pageSpeed.data : null;
 
-  // Measure basic performance metrics
-  const startTime = Date.now();
   let responseTime = 0;
   let ttfb = 0;
-
-  try {
-    const response = await axios.head(url, { timeout: TIMEOUT });
-    responseTime = Date.now() - startTime;
-    // TTFB approximation (actual TTFB requires browser)
-    ttfb = responseTime;
-  } catch {
-    // If HEAD fails, try GET
-    try {
-      const response = await axios.get(url, { timeout: TIMEOUT });
-      responseTime = Date.now() - startTime;
-      ttfb = responseTime;
-    } catch {
-      responseTime = 0;
-    }
+  if (!lab) {
+    const timing = await measureResponseTiming(url);
+    responseTime = timing.responseTime;
+    ttfb = timing.ttfb;
   }
 
-  // Analyze resources
   const resourceAnalysis = analyzeResources($, baseUrl);
+  const pageSpeedFields = pageSpeed ? pageSpeedChecks(pageSpeed, passed, warnings, failed) : {};
 
   return {
-    pageLoadTime: checkPageLoadTime(responseTime, passed, warnings, failed),
-    ttfb: checkTTFB(ttfb, passed, warnings, failed),
-    domContentLoaded: checkDOMContentLoaded(responseTime, passed, warnings, failed),
+    pageLoadTime: lab
+      ? lowerIsBetterCheck(
+          "Largest Contentful Paint",
+          lab.lcpMs,
+          lab.lcpDisplay,
+          2500,
+          4000,
+          "ms",
+          passed,
+          warnings,
+          failed,
+          "Reduce the largest element (hero image, banner, or heading) so it paints within 2.5 seconds on mobile."
+        )
+      : checkPageLoadTime(responseTime, passed, warnings, failed),
+    ttfb: lab
+      ? lowerIsBetterCheck(
+          "Time to First Byte",
+          lab.ttfbMs,
+          lab.ttfbDisplay,
+          800,
+          1800,
+          "ms",
+          passed,
+          warnings,
+          failed,
+          "Improve server response time with caching, a closer CDN, and a lighter document."
+        )
+      : checkTTFB(ttfb, passed, warnings, failed),
+    domContentLoaded: lab
+      ? {
+          ...lowerIsBetterCheck(
+            "First Contentful Paint",
+            lab.fcpMs,
+            lab.fcpDisplay,
+            1800,
+            3000,
+            "ms",
+            passed,
+            warnings,
+            failed,
+            "Reduce render-blocking CSS and JavaScript so the first content paints sooner."
+          ),
+          label: "First Contentful Paint",
+        }
+      : checkDOMContentLoaded(responseTime, passed, warnings, failed),
     totalPageSize: checkTotalPageSize(resourceAnalysis.totalSize, passed, warnings, failed),
     imageOptimization: checkImageOptimization($, resourceAnalysis, passed, warnings, failed),
     renderBlockingResources: checkRenderBlockingResources($, passed, warnings, failed),
     fontLoading: checkFontLoading($, passed, warnings, failed),
     thirdPartyScripts: checkThirdPartyScripts($, baseUrl, passed, warnings, failed),
+    ...pageSpeedFields,
   };
+}
+
+async function measureResponseTiming(url: string): Promise<{ responseTime: number; ttfb: number }> {
+  const startTime = Date.now();
+  try {
+    await axios.head(url, { timeout: TIMEOUT });
+    const responseTime = Date.now() - startTime;
+    return { responseTime, ttfb: responseTime };
+  } catch {
+    try {
+      await axios.get(url, { timeout: TIMEOUT });
+      const responseTime = Date.now() - startTime;
+      return { responseTime, ttfb: responseTime };
+    } catch {
+      return { responseTime: 0, ttfb: 0 };
+    }
+  }
+}
+
+function pageSpeedChecks(
+  attempt: PageSpeedAttempt,
+  passed: string[],
+  warnings: string[],
+  failed: string[]
+): Pick<
+  PerformanceCheck,
+  | "lighthouseScore"
+  | "cumulativeLayoutShift"
+  | "interactionToNextPaint"
+  | "totalBlockingTime"
+  | "fieldExperience"
+  | "pageSpeed"
+> {
+  if (!attempt.ok) {
+    warnings.push(`PageSpeed Insights unavailable: ${attempt.reason}`);
+    return {
+      pageSpeed: {
+        status: "warn",
+        label: "PageSpeed Insights",
+        message: `PageSpeed Insights unavailable: ${attempt.reason}`,
+        recommendation:
+          "Set PAGESPEED-INSIGHTS-API in .env and enable the PageSpeed Insights API for that key in Google Cloud.",
+      },
+    };
+  }
+
+  const data = attempt.data;
+  return {
+    lighthouseScore: scoreCheck(data, passed, warnings, failed),
+    cumulativeLayoutShift: lowerIsBetterCheck(
+      "Cumulative Layout Shift",
+      data.cls,
+      data.clsDisplay,
+      0.1,
+      0.25,
+      "cls",
+      passed,
+      warnings,
+      failed,
+      "Reserve space for images, ads, and embeds so the page does not jump while loading."
+    ),
+    interactionToNextPaint: data.fieldInpMs === null
+      ? undefined
+      : lowerIsBetterCheck(
+          "Interaction to Next Paint",
+          data.fieldInpMs,
+          null,
+          200,
+          500,
+          "ms",
+          passed,
+          warnings,
+          failed,
+          "Field INP from the Chrome UX Report. Break up long tasks and defer non-critical JavaScript."
+        ),
+    totalBlockingTime: lowerIsBetterCheck(
+      "Total Blocking Time",
+      data.tbtMs,
+      data.tbtDisplay,
+      200,
+      600,
+      "ms",
+      passed,
+      warnings,
+      failed,
+      "Lab responsiveness from PageSpeed Insights. Reduce main-thread work from scripts."
+    ),
+    fieldExperience: fieldExperienceCheck(data, passed, warnings, failed),
+  };
+}
+
+function scoreCheck(
+  data: PageSpeedMeasurement,
+  passed: string[],
+  warnings: string[],
+  failed: string[]
+): CheckResult {
+  const score = data.lighthouseScore;
+  if (score === null) {
+    warnings.push("PageSpeed Insights did not return a performance score");
+    return {
+      status: "warn",
+      label: "Lighthouse score",
+      message: "PageSpeed Insights did not return a performance score",
+      recommendation: `Open the full report: ${data.reportUrl}`,
+    };
+  }
+
+  const result: CheckResult = {
+    label: "Lighthouse score",
+    value: score,
+    recommendation: `Mobile lab data from PageSpeed Insights. Full report: ${data.reportUrl}`,
+    status: score >= 90 ? "pass" : score >= 50 ? "warn" : "fail",
+    message:
+      score >= 90
+        ? `Lighthouse performance score is ${score} (mobile)`
+        : score >= 50
+          ? `Lighthouse performance score is ${score} (mobile). 90+ is the target.`
+          : `Lighthouse performance score is ${score} (mobile). This is in the poor range.`,
+  };
+
+  if (result.status === "pass") passed.push(result.message);
+  else if (result.status === "warn") warnings.push(result.message);
+  else failed.push(result.message);
+  return result;
+}
+
+function fieldExperienceCheck(
+  data: PageSpeedMeasurement,
+  passed: string[],
+  warnings: string[],
+  failed: string[]
+): CheckResult {
+  if (!data.fieldCategory) {
+    return {
+      status: "warn",
+      label: "Field data (CrUX)",
+      message: "No Chrome UX Report field data for this URL",
+      recommendation: "Field data appears after the URL has enough Chrome traffic. The lab metrics above still apply.",
+    };
+  }
+
+  const parts = [
+    data.fieldLcpMs !== null ? `LCP ${formatDuration(data.fieldLcpMs)}` : null,
+    data.fieldInpMs !== null ? `INP ${formatDuration(data.fieldInpMs)}` : null,
+    data.fieldCls !== null ? `CLS ${data.fieldCls.toFixed(2)}` : null,
+  ].filter(Boolean);
+
+  const detail = parts.length > 0 ? ` ${parts.join(", ")}.` : "";
+  const status = data.fieldCategory === "FAST" ? "pass" : data.fieldCategory === "AVERAGE" ? "warn" : "fail";
+  const message = `Chrome UX Report rates this URL ${data.fieldCategory}.${detail}`;
+  const result: CheckResult = {
+    status,
+    label: "Field data (CrUX)",
+    message,
+    value: data.fieldCategory,
+    recommendation: "Field data is what Google uses for Core Web Vitals ranking. Lab data shows a single test run.",
+  };
+
+  if (status === "pass") passed.push(message);
+  else if (status === "warn") warnings.push(message);
+  else failed.push(message);
+  return result;
+}
+
+function lowerIsBetterCheck(
+  label: string,
+  value: number | null,
+  display: string | null,
+  good: number,
+  poor: number,
+  unit: "ms" | "cls",
+  passed: string[],
+  warnings: string[],
+  failed: string[],
+  recommendation: string
+): CheckResult {
+  if (value === null) {
+    warnings.push(`${label} was not returned by PageSpeed Insights`);
+    return {
+      status: "warn",
+      label,
+      message: `${label} was not returned by PageSpeed Insights`,
+      recommendation,
+    };
+  }
+
+  const shown = display || (unit === "cls" ? value.toFixed(3) : formatDuration(value));
+  const status = value <= good ? "pass" : value <= poor ? "warn" : "fail";
+  const target = unit === "cls" ? `${good}` : formatDuration(good);
+  const message =
+    status === "pass"
+      ? `${label} is ${shown} (mobile, PageSpeed Insights)`
+      : `${label} is ${shown} (mobile, PageSpeed Insights). Target is ${target} or less.`;
+
+  if (status === "pass") passed.push(message);
+  else if (status === "warn") warnings.push(message);
+  else failed.push(message);
+
+  return {
+    status,
+    label,
+    message,
+    value: unit === "cls" ? Number(value.toFixed(3)) : Math.round(value),
+    recommendation,
+  };
+}
+
+function formatDuration(ms: number): string {
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)} s`;
+  return `${Math.round(ms)} ms`;
 }
 
 interface ResourceAnalysis {

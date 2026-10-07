@@ -6,6 +6,7 @@ import { analyzeSecurity } from "@/lib/security-analyzer";
 import { analyzeAccessibility } from "@/lib/accessibility-analyzer";
 import { analyzeAnalytics } from "@/lib/analytics-analyzer";
 import { analyzeCaching } from "@/lib/caching-analyzer";
+import type { PageSpeedAttempt } from "@/lib/pagespeed";
 
 export interface PageReport {
   url: string;
@@ -260,7 +261,8 @@ export async function analyzePage(
   url: string, 
   baseUrl?: URL,
   headers?: Record<string, string | string[] | undefined>,
-  statusCode?: number | null
+  statusCode?: number | null,
+  pageSpeed?: PageSpeedAttempt
 ): Promise<PageReport> {
   const $ = cheerio.load(html);
   const issues: string[] = [];
@@ -406,9 +408,11 @@ export async function analyzePage(
     // Always run analytics (doesn't need headers)
     analytics = analyzeAnalytics(html, passed, warnings, failed);
 
-    // Run performance, security, and caching if headers are available
+    // PageSpeed is requested for the crawled entry URL even when response headers were not stored.
+    if (headers || pageSpeed) {
+      performance = await analyzePerformance(url, html, passed, warnings, failed, { pageSpeed });
+    }
     if (headers) {
-      performance = await analyzePerformance(url, html, passed, warnings, failed);
       security = await analyzeSecurity(url, html, headers, passed, warnings, failed);
       caching = await analyzeCaching(url, headers, passed, warnings, failed);
     }

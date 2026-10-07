@@ -100,12 +100,20 @@ function summarizePageSignals(page: PageReport) {
     },
     performance: page.performance
       ? (() => {
-          const loadMs = toNumericMetric(page.performance.pageLoadTime?.value);
+          const hasLabData = page.performance.lighthouseScore?.value !== undefined;
+          const loadMs = hasLabData ? null : toNumericMetric(page.performance.pageLoadTime?.value);
+          const lcpMs = hasLabData ? toNumericMetric(page.performance.pageLoadTime?.value) : null;
           const sizeMb = toNumericMetric(page.performance.totalPageSize?.value);
           return {
             loadMs,
+            lighthouseScore: toNumericMetric(page.performance.lighthouseScore?.value),
+            lcpMs,
+            cls: toNumericMetric(page.performance.cumulativeLayoutShift?.value),
+            inpMs: toNumericMetric(page.performance.interactionToNextPaint?.value),
+            ttfbMs: hasLabData ? toNumericMetric(page.performance.ttfb?.value) : null,
+            fieldExperience: page.performance.fieldExperience?.value ?? null,
             sizeMb,
-            slowPage: loadMs !== null && loadMs > 3000,
+            slowPage: (lcpMs !== null && lcpMs > 2500) || (loadMs !== null && loadMs > 3000),
             heavyPage: sizeMb !== null && sizeMb > 3,
           };
         })()

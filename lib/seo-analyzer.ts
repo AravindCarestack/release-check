@@ -17,6 +17,7 @@ import type {
   BrokenLink,
 } from "@/app/types";
 import { analyzePerformance } from "@/lib/performance-analyzer";
+import { measurePageSpeed, toPageSpeedSummary } from "@/lib/pagespeed";
 import { analyzeSecurity } from "@/lib/security-analyzer";
 import { analyzeAccessibility } from "@/lib/accessibility-analyzer";
 import { analyzeAnalytics } from "@/lib/analytics-analyzer";
@@ -42,6 +43,7 @@ export async function analyzeWebsite(url: string): Promise<SEOAnalysisResult> {
     const { html, finalUrl, statusCode, isHttps, httpRedirects, headers } = await fetchHtml(normalizedUrl);
     const $ = cheerio.load(html);
     const baseUrl = new URL(finalUrl);
+    const pageSpeedPromise = measurePageSpeed(finalUrl);
 
     // Analyze meta tags
     const metaTags = analyzeMetaTags($, passed, warnings, failed);
@@ -65,8 +67,9 @@ export async function analyzeWebsite(url: string): Promise<SEOAnalysisResult> {
       statusCode,
     }, passed, warnings, failed);
 
-    // Analyze performance
-    const performance = await analyzePerformance(finalUrl, html, passed, warnings, failed);
+    // Analyze performance. PageSpeed Insights runs in parallel with the checks above.
+    const pageSpeed = await pageSpeedPromise;
+    const performance = await analyzePerformance(finalUrl, html, passed, warnings, failed, { pageSpeed });
 
     // Analyze security
     const security = await analyzeSecurity(finalUrl, html, headers, passed, warnings, failed);
@@ -88,6 +91,7 @@ export async function analyzeWebsite(url: string): Promise<SEOAnalysisResult> {
       passed,
       warnings,
       failed,
+      pageSpeed: toPageSpeedSummary(pageSpeed, finalUrl),
       details: {
         metaTags,
         openGraph,
