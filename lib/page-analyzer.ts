@@ -7,6 +7,7 @@ import { analyzeAccessibility } from "@/lib/accessibility-analyzer";
 import { analyzeAnalytics } from "@/lib/analytics-analyzer";
 import { analyzeCaching } from "@/lib/caching-analyzer";
 import type { PageSpeedAttempt } from "@/lib/pagespeed";
+import { visibleText } from "@/lib/visible-text";
 
 export interface PageReport {
   url: string;
@@ -272,7 +273,7 @@ export async function analyzePage(
   const h1Count = h1Elements.length;
   const h1Texts: string[] = [];
   h1Elements.each((_, el) => {
-    const text = $(el).text().trim();
+    const text = visibleText($(el).text());
     if (text) h1Texts.push(text);
   });
   const hasSingleH1 = h1Count === 1;
@@ -293,7 +294,7 @@ export async function analyzePage(
   };
 
   // Analyze meta tags
-  const title = $("title").text().trim() || null;
+  const title = visibleText($("title").text()) || null;
   const description = $('meta[name="description"]').attr("content") || null;
   const keywords = $('meta[name="keywords"]').attr("content") || null;
   const robots = $('meta[name="robots"]').attr("content") || null;
@@ -327,14 +328,14 @@ export async function analyzePage(
 
   // Analyze Open Graph tags
   // Note: Missing OG tags are shown as warnings in the UI but don't contribute to fail status
-  const ogTitle = $('meta[property="og:title"]').attr("content") || null;
+  const ogTitle = visibleText($('meta[property="og:title"]').attr("content")) || null;
   const ogDescription = $('meta[property="og:description"]').attr("content") || null;
   const ogImage = $('meta[property="og:image"]').attr("content") || null;
 
   // Analyze Twitter Card tags
   // Note: Missing Twitter cards are warnings only, not failures
   const twitterCard = $('meta[name="twitter:card"]').attr("content") || null;
-  const twitterTitle = $('meta[name="twitter:title"]').attr("content") || null;
+  const twitterTitle = visibleText($('meta[name="twitter:title"]').attr("content")) || null;
   const twitterDescription = $('meta[name="twitter:description"]').attr("content") || null;
   const twitterImage = $('meta[name="twitter:image"]').attr("content") || null;
 

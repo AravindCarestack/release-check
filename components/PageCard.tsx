@@ -9,6 +9,7 @@ import type { CheckResult } from "@/app/types";
 import type { AlternateValidationResult } from "@/lib/alternate-validator";
 import type { AiInsightsResult } from "@/lib/ai-insights";
 import { buildPageSummary } from "@/lib/ai-insights-summary";
+import { visibleText } from "@/lib/visible-text";
 
 interface PageCardProps {
   page: PageReport;
@@ -122,7 +123,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
   const missingAlt = page.images?.missingAlt ?? 0;
   const emptyAlt = page.images?.emptyAlt ?? 0;
   const altIssues = missingAlt + emptyAlt;
-  const pageTitle = page.meta.title || page.og.title || page.h1Texts[0] || "Untitled page";
+  const pageTitle = visibleText(page.meta.title || page.og.title || page.h1Texts[0]) || "Untitled page";
   const hasJsonLd = page.jsonLd.present && page.jsonLd.valid;
   const isPerfect =
     page.hasSingleH1 &&
@@ -482,7 +483,7 @@ export default function PageCard({ page, alternateValidation }: PageCardProps) {
                 <CheckItem label="Title" hasValue={!!page.meta.title} />
                 {page.meta.title && (
                   <div className="py-1.5 text-xs text-gray-400 bg-gray-800 p-2 rounded break-words">
-                    <span className="font-medium">Title:</span> {page.meta.title}
+                    <span className="font-medium">Title:</span> {visibleText(page.meta.title)}
                   </div>
                 )}
                 <CheckItem label="Description" hasValue={!!page.meta.description} />

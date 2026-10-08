@@ -1,6 +1,5 @@
 import type { PageReport } from "@/lib/page-analyzer";
 import { buildCrawlSummary, buildPageSummary } from "@/lib/ai-insights-summary";
-
 export type SeoPerformanceRating = "excellent" | "good" | "fair" | "poor";
 export type ActionPriority = "Critical" | "High" | "Medium" | "Low";
 

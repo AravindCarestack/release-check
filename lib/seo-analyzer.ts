@@ -1,4 +1,5 @@
 import axios from "axios";
+import { visibleText } from "@/lib/visible-text";
 import * as cheerio from "cheerio";
 import type {
   SEOAnalysisResult,
@@ -192,7 +193,7 @@ function analyzeMetaTags(
   warnings: string[],
   failed: string[]
 ): MetaTagCheck {
-  const title = $("title").text().trim();
+  const title = visibleText($("title").text());
   const description = $('meta[name="description"]').attr("content") || "";
   const robots = $('meta[name="robots"]').attr("content") || "";
   const canonical = $('link[rel="canonical"]').attr("href") || "";
@@ -326,7 +327,7 @@ function analyzeOpenGraph(
   warnings: string[],
   failed: string[]
 ): OpenGraphCheck {
-  const ogTitle = $('meta[property="og:title"]').attr("content") || "";
+  const ogTitle = visibleText($('meta[property="og:title"]').attr("content"));
   const ogDescription = $('meta[property="og:description"]').attr("content") || "";
   const ogImage = $('meta[property="og:image"]').attr("content") || "";
   const ogUrl = $('meta[property="og:url"]').attr("content") || "";
@@ -367,7 +368,7 @@ function analyzeTwitter(
   failed: string[]
 ): TwitterCheck {
   const twitterCard = $('meta[name="twitter:card"]').attr("content") || "";
-  const twitterTitle = $('meta[name="twitter:title"]').attr("content") || "";
+  const twitterTitle = visibleText($('meta[name="twitter:title"]').attr("content"));
   const twitterDescription = $('meta[name="twitter:description"]').attr("content") || "";
   const twitterImage = $('meta[name="twitter:image"]').attr("content") || "";
 
