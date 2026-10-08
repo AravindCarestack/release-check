@@ -25,7 +25,8 @@ type FilterType =
   | "canonicalWarning"
   | "alternateIssue"
   | "missingOgImage"
-  | "imageAltIssue";
+  | "imageAltIssue"
+  | "missingJsonLd";
 
 type StatusSortKey = "pass" | "warn" | "fail";
 
@@ -148,6 +149,8 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
         return pages.filter((p) => !p.og.image);
       case "imageAltIssue":
         return pages.filter((p) => (p.images?.missingAlt ?? 0) + (p.images?.emptyAlt ?? 0) > 0);
+      case "missingJsonLd":
+        return pages.filter((p) => !(p.jsonLd?.present && p.jsonLd?.valid));
       default:
         return pages;
     }
@@ -344,6 +347,16 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
             Image Alt Issues
           </button>
           <button
+            onClick={() => setFilter("missingJsonLd")}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
+              filter === "missingJsonLd"
+                ? "bg-blue-600 text-white"
+                : "bg-gray-900 border border-gray-600 text-gray-300 hover:bg-gray-800"
+            }`}
+          >
+            No JSON-LD
+          </button>
+          <button
             type="button"
             onClick={runAlternateValidation}
             disabled={validatingAlternates || pages.length === 0}
@@ -400,7 +413,9 @@ export default function PageGrid({ pages, sitemapUrl, siteUrl }: PageGridProps) 
                   ? "Missing OG image"
                   : filter === "imageAltIssue"
                     ? "Image alt issues"
-                    : filter})
+                    : filter === "missingJsonLd"
+                      ? "No JSON-LD"
+                      : filter})
             </span>
           )}
           {notFoundOnly && (
